@@ -1,0 +1,4 @@
+import vtab.dummy_formatter
+
+f = vtab.dummy_formatter.DummyFormatter()
+f.test('one')
