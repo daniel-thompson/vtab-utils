@@ -8,6 +8,10 @@ f = vtab.dummy_formatter.DummyFormatter()
 p = vtab.vtab_parser.VtabParser()
 p.add_formatter(f)
 
-for ln in sys.stdin.readlines():
-	ln = ln.rstrip()
-	p.parse(ln)
+if 0 != len(sys.argv):
+	for fname in sys.argv:
+		f = open(fname)
+		p.parse_file(f)
+		f.close()
+else:
+	p.parse_file(sys.stdin)

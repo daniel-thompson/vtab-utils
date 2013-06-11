@@ -45,3 +45,7 @@ class VtabParser():
 		if None != barline:
 			self.parse_decoration(barline.group(2))
 			self.parse_barline(barline.group(1))
+
+	def parse_file(self, f):
+		for ln in f.readlines():
+			self.parse(ln.rstrip())
