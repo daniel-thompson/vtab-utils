@@ -5,6 +5,7 @@ Key: C
 Time: 4/4
 
 ===========
+# The 8 causes each line to be treated as an eigth note (quaver)
 | 3 | | | |  8
 | | 0 | | |
 | | 2 | | |
