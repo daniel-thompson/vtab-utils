@@ -4,3 +4,6 @@ __all__ = [
 	'ly_formatter',
 	'vtab_parser'
 ]
+
+from vtab_parser import VtabParser
+from dummy_formatter import DummyFormatter
