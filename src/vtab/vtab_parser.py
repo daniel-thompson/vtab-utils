@@ -1,9 +1,10 @@
-import re
+import re, unittest
+from note import Note
 
-class VtabParser():
+class VtabParser(object):
 	'''Match a barline (or underline), yielding barline and decoration
 	Template is: "============ <decoration>"'''
-	RE_BARLINE = re.compile(r'^\s*([-=]{4}[-=]*)\s*(.*)$')
+	RE_BARLINE = re.compile(r'^\s*(:*[-=]{4}[-=]*:*)\s*(.*)$')
 
 	'''Match a # character, yielding the associated comment
 	Template is: "# This is a comment"'''
@@ -23,6 +24,13 @@ class VtabParser():
 	def __init__(self):
 		self.formatters = []
 		self.prev_line = None
+		
+		self.tuning = (Note('E2'),
+			       Note('A2'),
+			       Note('D3'),
+			       Note('G3'),
+			       Note('B3'),
+			       Note('E4'))
 
 	def add_formatter(self, formatter):
 		if not formatter in self.formatters:
@@ -54,7 +62,19 @@ class VtabParser():
 		self.format_barline(line)
 
 	def parse_note(self, note):
-		self.format_note(note)
+		notes = note.split()
+		
+		decorations = notes[len(self.tuning):]
+		notes = notes[0:len(self.tuning)]
+		
+		def parse_string(open_string, fret):
+			try:
+				return open_string + int(fret)
+			except:
+				return None
+		notes = [ parse_string(open_string, fret) for (open_string, fret) in zip(self.tuning, notes) ]
+				
+		self.format_note(tuple(notes))
 
 	def parse(self, s):
 		'''Categorize the line and handle any error reporting.'''
@@ -101,3 +121,108 @@ class VtabParser():
 		for ln in f.readlines():
 			self.parse(ln.rstrip())
 		self.flush()
+
+class MockFormatter(object):
+	def __init__(self):
+		self.history = []
+
+	def __getattr__(self, name):
+		def mock(*args, **kwargs):
+			if 0 == len(kwargs):
+				self.history.append((name,) + args)
+			else:
+				self.history.append((name,) + args + (kwargs,))
+		return mock
+
+class VtabParserTest(unittest.TestCase):
+	def setUp(self):
+		self.parser = VtabParser()
+		self.formatter = MockFormatter()
+		self.parser.add_formatter(self.formatter)
+		self.assertEqual(len(self.formatter.history), 0)
+		self.history_counter = 0
+
+	def tearDown(self):
+		# Check for unexpected history
+		self.assertEqual(len(self.formatter.history), self.history_counter)
+		
+		# Check that no state is held by the parser at the end of the test
+		self.parser.flush()
+		self.assertEqual(len(self.formatter.history), self.history_counter)
+		
+	def expectHistory(self, t):
+		self.assertTupleEqual(self.formatter.history[self.history_counter], t)
+		self.history_counter += 1
+	
+	def testComment(self):
+		comment = '# This is a comment'
+		self.parser.parse(comment)
+		self.expectHistory(('format_attribute', 'comment', comment[2:]))
+
+	def testUnderlinedTitle(self):
+		title = 'This is a title'
+		self.parser.parse(title)
+		self.assertEqual(len(self.formatter.history), 0)
+		
+		self.parser.parse('========')
+		self.expectHistory(('format_attribute', 'title', title))
+		
+	def testKeyPairTitle(self):
+		title = 'This is a title'
+		self.parser.parse('title: ' + title)
+		self.expectHistory(('format_attribute', 'title', title))
+		
+	def testKeyPairCaseNormalization(self):
+		title = 'This is a title'
+		self.parser.parse('Title: ' + title)
+		self.expectHistory(('format_attribute', 'title', title))
+
+		self.parser.parse('TITLE: ' + title)
+		self.expectHistory(('format_attribute', 'title', title))
+	
+	def testKeyPairWithoutWhitespace(self):
+		title = 'This is a title'
+		self.parser.parse('title:' + title)
+		self.expectHistory(('format_attribute', 'title', title))
+		
+	def testKeyPairWithExcessiveWhitespace(self):
+		title = 'This is a title'
+		self.parser.parse('\ttitle  : \t ' + title)
+		self.expectHistory(('format_attribute', 'title', title))
+		
+	def testSingleBarLine(self):
+		self.parser.parse('--------')
+		# TODO: Need to check what type barline is (not yet implemented)
+		self.formatter.history[0] = self.formatter.history[0][0:1]
+		self.expectHistory(('format_barline',))
+		
+	def testDoulbeBarLine(self):
+		self.parser.parse('========')
+		# TODO: Need to check what type barline is (not yet implemented)
+		self.formatter.history[0] = self.formatter.history[0][0:1]
+		self.expectHistory(('format_barline',))
+				
+	def testRepeatOpen(self):
+		self.parser.parse('=======:')
+		# TODO: Need to check what type barline is (not yet implemented)
+		self.formatter.history[0] = self.formatter.history[0][0:1]
+		self.expectHistory(('format_barline',))
+
+	def testRepeatClose(self):
+		self.parser.parse(':=======')
+		# TODO: Need to check what type barline is (not yet implemented)
+		self.formatter.history[0] = self.formatter.history[0][0:1]
+		self.expectHistory(('format_barline',))
+
+
+	def testRepeatCloseOpen(self):
+		self.parser.parse(':======:')
+		# TODO: Need to check what type barline is (not yet implemented)
+		self.formatter.history[0] = self.formatter.history[0][0:1]
+		self.expectHistory(('format_barline',))
+		
+	def testOpenString6(self):
+		self.parser.parse('0 | | | | |')
+		# TODO: Need to check what type barline is (not yet implemented)
+		#self.formatter.history[0] = self.formatter.history[0][0:1]
+		self.expectHistory(('format_note', (Note('E2'), None, None, None, None, None)))

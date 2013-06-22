@@ -5,5 +5,6 @@ __all__ = [
 	'vtab_parser'
 ]
 
-from vtab_parser import VtabParser
 from dummy_formatter import DummyFormatter
+from note import Note
+from vtab_parser import VtabParser
