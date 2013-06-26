@@ -82,19 +82,19 @@ class VtabParser(object):
 				self.parse_keypair("title", self.prev_line)
 				self.prev_line = None
 				return
-			
+
 			self.flush()
 			self.parse_decoration(barline.group(2))
 			self.parse_barline(barline.group(1))
 			return
-		
+
 		self.flush()
-		
+
 		comment = self.RE_COMMENT.match(s)
 		if None != comment:
 			self.format_attribute('comment', comment.group(1))
 			return
-		
+
 		keypair = self.RE_KEYPAIR.match(s)
 		if None != keypair:
 			self.parse_keypair(keypair.group(1), keypair.group(2))
@@ -144,11 +144,11 @@ class VtabParserTest(unittest.TestCase):
 	def tearDown(self):
 		# Check for unexpected history
 		self.assertEqual(len(self.formatter.history), self.history_counter)
-		
+
 		# Check that no state is held by the parser at the end of the test
 		self.parser.flush()
 		self.assertEqual(len(self.formatter.history), self.history_counter)
-		
+
 	def expectHistory(self, t):
 		self.assertTupleEqual(self.formatter.history[self.history_counter], t)
 		self.history_counter += 1
@@ -171,15 +171,15 @@ class VtabParserTest(unittest.TestCase):
 		title = 'This is a title'
 		self.parser.parse(title)
 		self.assertEqual(len(self.formatter.history), 0)
-		
+
 		self.parser.parse('========')
 		self.expectHistory(('format_attribute', 'title', title))
-		
+
 	def testKeyPairTitle(self):
 		title = 'This is a title'
 		self.parser.parse('title: ' + title)
 		self.expectHistory(('format_attribute', 'title', title))
-		
+
 	def testKeyPairCaseNormalization(self):
 		title = 'This is a title'
 		self.parser.parse('Title: ' + title)
@@ -187,29 +187,29 @@ class VtabParserTest(unittest.TestCase):
 
 		self.parser.parse('TITLE: ' + title)
 		self.expectHistory(('format_attribute', 'title', title))
-	
+
 	def testKeyPairWithoutWhitespace(self):
 		title = 'This is a title'
 		self.parser.parse('title:' + title)
 		self.expectHistory(('format_attribute', 'title', title))
-		
+
 	def testKeyPairWithExcessiveWhitespace(self):
 		title = 'This is a title'
 		self.parser.parse('\ttitle  : \t ' + title)
 		self.expectHistory(('format_attribute', 'title', title))
-		
+
 	def testSingleBarLine(self):
 		self.parser.parse('--------')
 		# TODO: Need to check what type barline is (not yet implemented)
 		self.formatter.history[0] = self.formatter.history[0][0:1]
 		self.expectHistory(('format_barline',))
-		
+
 	def testDoulbeBarLine(self):
 		self.parser.parse('========')
 		# TODO: Need to check what type barline is (not yet implemented)
 		self.formatter.history[0] = self.formatter.history[0][0:1]
 		self.expectHistory(('format_barline',))
-				
+
 	def testRepeatOpen(self):
 		self.parser.parse('=======:')
 		# TODO: Need to check what type barline is (not yet implemented)
