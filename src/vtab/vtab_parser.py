@@ -1,4 +1,5 @@
 import re, unittest
+from vtab import tunings
 from note import Note
 
 class VtabParser(object):
@@ -24,13 +25,8 @@ class VtabParser(object):
 	def __init__(self):
 		self.formatters = []
 		self.prev_line = None
-		
-		self.tuning = (Note('E2'),
-			       Note('A2'),
-			       Note('D3'),
-			       Note('G3'),
-			       Note('B3'),
-			       Note('E4'))
+
+		self._tuning = tunings.STANDARD_TUNING
 
 	def add_formatter(self, formatter):
 		if not formatter in self.formatters:
@@ -63,17 +59,17 @@ class VtabParser(object):
 
 	def parse_note(self, note):
 		notes = note.split()
-		
-		decorations = notes[len(self.tuning):]
-		notes = notes[0:len(self.tuning)]
-		
+
+		decorations = notes[len(self._tuning):]
+		notes = notes[0:len(self._tuning)]
+
 		def parse_string(open_string, fret):
 			try:
 				return open_string + int(fret)
 			except:
 				return None
-		notes = [ parse_string(open_string, fret) for (open_string, fret) in zip(self.tuning, notes) ]
-				
+		notes = [ parse_string(open_string, fret) for (open_string, fret) in zip(self._tuning, notes) ]
+
 		self.format_note(tuple(notes))
 
 	def parse(self, s):
@@ -121,6 +117,9 @@ class VtabParser(object):
 		for ln in f.readlines():
 			self.parse(ln.rstrip())
 		self.flush()
+		for formatter in self.formatters:
+			formatter.flush()
+
 
 class MockFormatter(object):
 	def __init__(self):
@@ -153,7 +152,16 @@ class VtabParserTest(unittest.TestCase):
 	def expectHistory(self, t):
 		self.assertTupleEqual(self.formatter.history[self.history_counter], t)
 		self.history_counter += 1
-	
+
+	def expectNote(self, template):
+		def parse_note(note):
+			try:
+				return Note(note)
+			except:
+				return None
+		notes = [parse_note(note) for note in template.split()]
+		self.expectHistory(('format_note', tuple(notes)))
+
 	def testComment(self):
 		comment = '# This is a comment'
 		self.parser.parse(comment)
@@ -220,9 +228,36 @@ class VtabParserTest(unittest.TestCase):
 		# TODO: Need to check what type barline is (not yet implemented)
 		self.formatter.history[0] = self.formatter.history[0][0:1]
 		self.expectHistory(('format_barline',))
-		
-	def testOpenString6(self):
+
+	def testOpenStrings(self):
 		self.parser.parse('0 | | | | |')
-		# TODO: Need to check what type barline is (not yet implemented)
-		#self.formatter.history[0] = self.formatter.history[0][0:1]
-		self.expectHistory(('format_note', (Note('E2'), None, None, None, None, None)))
+		self.expectNote('E2  X  X  X  X  X')
+
+		self.parser.parse('| 0 | | | |')
+		self.expectNote(' X A2  X  X  X  X')
+
+		self.parser.parse('| | 0 | | |')
+		self.expectNote(' X  X D3  X  X  X')
+
+		self.parser.parse('| | | 0 | |')
+		self.expectNote(' X  X  X G3  X  X')
+
+		self.parser.parse('| | | | 0 |')
+		self.expectNote(' X  X  X  X B3  X')
+
+		self.parser.parse('| | | | | 0')
+		self.expectNote(' X  X  X  X  X E4')
+
+	def testBigChords(self):
+		self.parser.parse(' 3  2  0  0  0  3')
+		self.expectNote(  'G2 B2 D3 G3 B3 G4')
+
+		self.parser.parse(' |  3  2  0  1  0')
+		self.expectNote(  ' X C3 E3 G3 C4 E4')
+
+		self.parser.parse('12 14 14 13  12 12')
+		self.expectNote(  'E3 B3 E4 G#4 B4 E5')
+
+if __name__ == "__main__":
+	#import sys;sys.argv = ['', 'Test.testName']
+	unittest.main()
