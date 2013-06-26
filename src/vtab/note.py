@@ -16,13 +16,19 @@ class Note(object):
 			self.set(s)
 			
 	def __cmp__(self, other):
+		if None == other:
+			return 1
+
 		return int(self) - int(other)
 
 	def __add__(self, other):
-		return Note(self.pitch + other)
+		return Note(self.pitch + int(other))
 
 	def __sub__(self, other):
-		return Note(self.pitch - other)
+		if isinstance(other, Note):
+			return self.pitch - other.pitch
+		else:
+			return Note(self.pitch - int(other))
 
 	def __repr__(self):
 		me = self.decompose()
@@ -129,7 +135,12 @@ class NoteTest(unittest.TestCase):
 		
 	def testSubraction(self):
 		self.assertEqual('B3', str(self.note - 1))
-	
+
+	def testNoteSubtraction(self):
+		self.assertEqual(1, self.note - Note('B3'))
+		self.assertEqual(0, self.note - Note('C4'))
+		self.assertEqual(-1, self.note - Note('C#4'))
+
 	def testIncrementalAddition(self):
 		self.note += 2
 		self.assertEqual('D4', str(self.note))
@@ -141,6 +152,10 @@ class NoteTest(unittest.TestCase):
 	def testEqualityComparison(self):
 		localnote = Note(int(self.note))
 		self.assertEqual(localnote, self.note)
+
+	def testNoneComparision(self):
+		self.assertNotEqual(self.note, None)
+		self.assertNotEqual(None, self.note)
 
 	def testGreaterThan(self):
 		localnote = Note(int(self.note) + 1)
