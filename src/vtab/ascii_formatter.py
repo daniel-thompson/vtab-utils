@@ -3,6 +3,8 @@ from vtab import tunings
 from note import Note
 
 class AsciiFormatter(object):
+	LINE_LENGTH = 80
+
 	def __init__(self):
 		self.f = sys.stdout
 		self._staff_lines = ()
@@ -54,11 +56,20 @@ class AsciiFormatter(object):
 		self.f.write('\n')
 
 	def format_barline(self, unused):
+		width = len(''.join(self._staff_lines[0])) + 2
+		if width >= self.LINE_LENGTH:
+			self.flush()
+			width = 0
+
 		for s in self._staff_lines:
 			if len(s) == 0:
 				s.append('|')
 			else:
 				s.append('-|')
+
+		if width >= self.LINE_LENGTH - 16:
+			self.flush()
+			self.format_barline(unused)
 
 	def format_note(self, notes):
 		frets = []
@@ -69,18 +80,30 @@ class AsciiFormatter(object):
 				fret = int(note - tuning)
 				frets.append(str(fret))
 		width = max([ len(fret) for fret in frets ]) + 1
+		if len(''.join(self._staff_lines[0])) + width >= self.LINE_LENGTH:
+			self.flush()
 		for line, fret in zip(self._staff_lines, frets):
 			padding = width - len(fret)
 			line.append(('-' * padding) + fret)
 
 	def flush(self):
-		for s in reversed(self._staff_lines):
-			if len(s) > 0:
-				self.f.write(''.join(s) + '\n')
+		issue_seperator = False
+		if len(self._staff_lines) > 0 and len(self._staff_lines[0]) > 0:
+			lastline = None
+			for s in reversed(self._staff_lines):
+				line = ''.join(s) + '\n'
+				self.f.write(line)
 				del s[:]
+
+				# Check that all staff lines are the same length
+				assert(lastline == None or len(line) == len(lastline))
+				lastline = line
+			issue_seperator = True
 		for c in self._comments:
 			self.f.write(c)
 		del self._comments[:]
+		if issue_seperator:
+			self.f.write('\n')
 
 class MockWriter(object):
 	def __init__(self):
@@ -154,7 +177,7 @@ class AsciiFormatterTest(unittest.TestCase):
 		for t in tunings.STANDARD_TUNING:
 			self.expectRegex('^|$')
 		self.expectRegex('^# %s$' % (comment))
-			
+		self.expectRegex('^$')
 
 	def testFormatAttributeKey(self):
 		self.formatter.format_attribute('key', 'C')
@@ -170,6 +193,7 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.formatter.flush()
 		for t in tunings.STANDARD_TUNING:
 			self.expectRegex('^|$')
+		self.expectRegex('^$')
 
 	def testFormatBarlineAtEndOfLine(self):
 		self.formatter.format_note(tunings.STANDARD_TUNING)
@@ -178,6 +202,22 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.formatter.flush()
 		for t in tunings.STANDARD_TUNING:
 			self.expectRegex('^-0-|$')
+		self.expectRegex('^$')
+
+	def testFormatBarlineEarlyWrap(self):
+		self.writer.log = True
+		for i in range(32):
+			self.formatter.format_barline('unused')
+		self.expectNoOutput()
+		self.formatter.format_barline('unused')
+		for t in tunings.STANDARD_TUNING:
+			self.expectRegex('^|' + ('-|' * 31) + '$')
+		self.expectRegex('^$')
+		self.formatter.flush()
+		for t in tunings.STANDARD_TUNING:
+			self.expectRegex('^|$')
+		self.expectRegex('^$')
+
 
 	def testFormatNoteWithUnfrettedStrum(self):
 		self.formatter.format_note(tunings.STANDARD_TUNING)
@@ -185,6 +225,7 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.formatter.flush()
 		for t in tunings.STANDARD_TUNING:
 			self.expectRegex('^-0$')
+		self.expectRegex('^$')
 
 	def testFormatNoteBigEChord(self):
 		chord = (0, 2, 2, 1, 0, 0)
@@ -198,6 +239,7 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.expectRegex('^-2$')
 		self.expectRegex('^-2$')
 		self.expectRegex('^-0$')
+		self.expectRegex('^$')
 
 	def testFormatNoteDChord(self):
 		chord = (None, None, 0, 2, 3, 2)
@@ -211,7 +253,8 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.expectRegex('^-0$')
 		self.expectRegex('^--$')
 		self.expectRegex('^--$')
-		
+		self.expectRegex('^$')
+
 	def testFormatNoteNinthPositionBarre(self):
 		chord = (9, 11, 11, 10, 9, 9)
 		notes = tunings.chord(chord)
@@ -224,6 +267,20 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.expectRegex('^-11$')
 		self.expectRegex('^-11$')
 		self.expectRegex('^--9$')
+		self.expectRegex('^$')
+
+	def testFormatNoteLineEndings(self):
+		for i in range(39):
+			self.formatter.format_note(tunings.STANDARD_TUNING)
+		self.expectNoOutput()
+		self.formatter.format_note(tunings.STANDARD_TUNING)
+		for t in tunings.STANDARD_TUNING:
+			self.expectRegex('^' + ('-0' * 39) + '$')
+		self.expectRegex('^$')
+		self.formatter.flush()
+		for t in tunings.STANDARD_TUNING:
+			self.expectRegex('^-0$')
+		self.expectRegex('^$')
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
