@@ -5,6 +5,7 @@ __all__ = [
 	'vtab_parser'
 ]
 
+from ascii_formatter import AsciiFormatter
 from dummy_formatter import DummyFormatter
 from note import Note
 from vtab_parser import VtabParser
