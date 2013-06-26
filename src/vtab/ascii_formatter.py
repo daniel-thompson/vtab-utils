@@ -34,7 +34,11 @@ class AsciiFormatter(object):
 			self.f.write("ERROR: Unsupported attribute (%s: '%s')\n" % (key, value))
 
 	def format_comment(self, comment):
-		self.f.write('# %s\n' % (comment))
+		comment = '# %s\n' % (comment)
+		if len(self._staff_lines[0]) == 0:
+			self.f.write(comment)
+		else:
+			self._comments.append(comment)
 
 	def format_key(self, unused):
 		# For tab only output the key is not important
@@ -57,25 +61,34 @@ class AsciiFormatter(object):
 				s.append('-|')
 
 	def format_note(self, notes):
-		for s, note, tuning in zip(self._staff_lines, notes, self._tuning):
+		frets = []
+		for note, tuning in zip(notes, self._tuning):
 			if note == None:
-				s.append('--')
+				frets.append('')
 			else:
 				fret = int(note - tuning)
-				s.append('-' + str(fret))
+				frets.append(str(fret))
+		width = max([ len(fret) for fret in frets ]) + 1
+		for line, fret in zip(self._staff_lines, frets):
+			padding = width - len(fret)
+			line.append(('-' * padding) + fret)
 
 	def flush(self):
-		for s in self._staff_lines:
+		for s in reversed(self._staff_lines):
 			if len(s) > 0:
 				self.f.write(''.join(s) + '\n')
 				del s[:]
+		for c in self._comments:
+			self.f.write(c)
+		del self._comments[:]
 
 class MockWriter(object):
 	def __init__(self):
 		self.history = []
-
+		self.log = False
 	def write(self, s):
-		sys.stdout.write('output >>> ' + s)
+		if self.log:
+			sys.stdout.write('output >>> ' + s)
 		self.history.append(('write', s.rstrip()))
 
 	def flush(self, s):
@@ -116,6 +129,9 @@ class AsciiFormatterTest(unittest.TestCase):
 		ln = h[1]
 		self.assertTrue(re.search(r, ln))
 
+	def expectNoOutput(self):
+		self.assertEqual(self.history_counter, len(self.writer.history))
+
 	def testFormatAttributeTitle(self):
 		title = 'Unit test title'
 		self.formatter.format_attribute('title', title)
@@ -129,6 +145,17 @@ class AsciiFormatterTest(unittest.TestCase):
 		# Should self-flush because there are no staff text acculated
 		self.expectRegex('^# %s$' % (comment))
 
+	def testFormatAttributeDelayedComment(self):
+		comment = 'This is a comment'
+		self.formatter.format_barline('unused')
+		self.formatter.format_attribute('comment', comment)
+		self.expectNoOutput() # No output until flush
+		self.formatter.flush()
+		for t in tunings.STANDARD_TUNING:
+			self.expectRegex('^|$')
+		self.expectRegex('^# %s$' % (comment))
+			
+
 	def testFormatAttributeKey(self):
 		self.formatter.format_attribute('key', 'C')
 		# No output expected (and tested for by tearDown() )
@@ -139,6 +166,7 @@ class AsciiFormatterTest(unittest.TestCase):
 
 	def testFormatBarlineAtStartOfLine(self):
 		self.formatter.format_barline('unused')
+		self.expectNoOutput()
 		self.formatter.flush()
 		for t in tunings.STANDARD_TUNING:
 			self.expectRegex('^|$')
@@ -146,15 +174,56 @@ class AsciiFormatterTest(unittest.TestCase):
 	def testFormatBarlineAtEndOfLine(self):
 		self.formatter.format_note(tunings.STANDARD_TUNING)
 		self.formatter.format_barline('unused')
+		self.expectNoOutput()
 		self.formatter.flush()
 		for t in tunings.STANDARD_TUNING:
 			self.expectRegex('^-0-|$')
 
 	def testFormatNoteWithUnfrettedStrum(self):
 		self.formatter.format_note(tunings.STANDARD_TUNING)
+		self.expectNoOutput()
 		self.formatter.flush()
 		for t in tunings.STANDARD_TUNING:
 			self.expectRegex('^-0$')
+
+	def testFormatNoteBigEChord(self):
+		chord = (0, 2, 2, 1, 0, 0)
+		notes = tunings.chord(chord)
+		self.formatter.format_note(notes)
+		self.expectNoOutput()
+		self.formatter.flush()
+		self.expectRegex('^-0$')
+		self.expectRegex('^-0$')
+		self.expectRegex('^-1$')
+		self.expectRegex('^-2$')
+		self.expectRegex('^-2$')
+		self.expectRegex('^-0$')
+
+	def testFormatNoteDChord(self):
+		chord = (None, None, 0, 2, 3, 2)
+		notes = tunings.chord(chord)
+		self.formatter.format_note(notes)
+		self.expectNoOutput()
+		self.formatter.flush()
+		self.expectRegex('^-2$')
+		self.expectRegex('^-3$')
+		self.expectRegex('^-2$')
+		self.expectRegex('^-0$')
+		self.expectRegex('^--$')
+		self.expectRegex('^--$')
+		
+	def testFormatNoteNinthPositionBarre(self):
+		chord = (9, 11, 11, 10, 9, 9)
+		notes = tunings.chord(chord)
+		self.formatter.format_note(notes)
+		self.expectNoOutput()
+		self.formatter.flush()
+		self.expectRegex('^--9$')
+		self.expectRegex('^--9$')
+		self.expectRegex('^-10$')
+		self.expectRegex('^-11$')
+		self.expectRegex('^-11$')
+		self.expectRegex('^--9$')
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
