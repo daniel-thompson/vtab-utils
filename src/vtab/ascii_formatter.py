@@ -1,6 +1,5 @@
 import re, unittest, sys
 from vtab import tunings
-from note import Note
 
 class AsciiFormatter(object):
 	LINE_LENGTH = 80
@@ -20,7 +19,7 @@ class AsciiFormatter(object):
 		self._tuning = tuning
 
 		staff_lines = []
-		for s in self._tuning:
+		for dummy in self._tuning:
 			staff_lines.append([])
 		self._staff_lines = tuple(staff_lines)
 
@@ -114,11 +113,6 @@ class MockWriter(object):
 			sys.stdout.write('output >>> ' + s)
 		self.history.append(('write', s.rstrip()))
 
-	def flush(self, s):
-		# We avoid adding flush calls to the history (the implementation can
-		# call this at all sorts of th different times).
-		pass
-
 	def __getattr__(self, name):
 		def mock(*args, **kwargs):
 			if 0 == len(kwargs):
@@ -174,7 +168,7 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.formatter.format_attribute('comment', comment)
 		self.expectNoOutput() # No output until flush
 		self.formatter.flush()
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^|$')
 		self.expectRegex('^# %s$' % (comment))
 		self.expectRegex('^$')
@@ -187,11 +181,15 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.formatter.format_attribute('time', '4/4')
 		# No output expected (and tested for by tearDown() )
 
+	def testFormatAttributeUnknown(self):
+		self.formatter.format_attribute('unknown', 'unknown')
+		self.expectRegex('Unsupported attribute')
+
 	def testFormatBarlineAtStartOfLine(self):
 		self.formatter.format_barline('unused')
 		self.expectNoOutput()
 		self.formatter.flush()
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^|$')
 		self.expectRegex('^$')
 
@@ -200,30 +198,55 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.formatter.format_barline('unused')
 		self.expectNoOutput()
 		self.formatter.flush()
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^-0-|$')
 		self.expectRegex('^$')
 
 	def testFormatBarlineEarlyWrap(self):
-		self.writer.log = True
-		for i in range(32):
+		for dummy in range(32):
 			self.formatter.format_barline('unused')
 		self.expectNoOutput()
 		self.formatter.format_barline('unused')
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^|' + ('-|' * 31) + '$')
 		self.expectRegex('^$')
 		self.formatter.flush()
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^|$')
 		self.expectRegex('^$')
 
+	def testFormatBarlineLastCharacterWrap(self):
+		self.formatter.format_barline('unused')
+		for dummy in range(38):
+			self.formatter.format_note(tunings.STANDARD_TUNING)
+		self.expectNoOutput()
+		self.formatter.format_barline('unused')
+		for dummy in tunings.STANDARD_TUNING:
+			self.expectRegex('^|' + ('-0' * 38) + '-|$')
+		self.expectRegex('^$')
+		self.formatter.flush()
+		for dummy in tunings.STANDARD_TUNING:
+			self.expectRegex('^|$')
+		self.expectRegex('^$')
+
+	def testFormatBarlineLateWrap(self):
+		for dummy in range(39):
+			self.formatter.format_note(tunings.STANDARD_TUNING)
+		self.expectNoOutput()
+		self.formatter.format_barline('unused')
+		for dummy in tunings.STANDARD_TUNING:
+			self.expectRegex('^' + ('-0' * 39) + '$')
+		self.expectRegex('^$')
+		self.formatter.flush()
+		for dummy in tunings.STANDARD_TUNING:
+			self.expectRegex('^|$')
+		self.expectRegex('^$')
 
 	def testFormatNoteWithUnfrettedStrum(self):
 		self.formatter.format_note(tunings.STANDARD_TUNING)
 		self.expectNoOutput()
 		self.formatter.flush()
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^-0$')
 		self.expectRegex('^$')
 
@@ -270,15 +293,15 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.expectRegex('^$')
 
 	def testFormatNoteLineEndings(self):
-		for i in range(39):
+		for dummy in range(39):
 			self.formatter.format_note(tunings.STANDARD_TUNING)
 		self.expectNoOutput()
 		self.formatter.format_note(tunings.STANDARD_TUNING)
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^' + ('-0' * 39) + '$')
 		self.expectRegex('^$')
 		self.formatter.flush()
-		for t in tunings.STANDARD_TUNING:
+		for dummy in tunings.STANDARD_TUNING:
 			self.expectRegex('^-0$')
 		self.expectRegex('^$')
 
