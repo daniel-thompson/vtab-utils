@@ -43,6 +43,23 @@ class Note(object):
 
 		return (letter, sharpflat, octave)
 
+	def to_lilypond(self):
+		(letter, sharpflat, octave) = self.decompose()
+		letter = letter.lower()
+		if sharpflat == '#':
+			letter += 'is'
+		elif sharpflat == 'b':
+			letter += 'es'
+		else:
+			assert sharpflat == ''
+
+		if octave > 3:
+			letter += "'" * (octave - 3)
+		elif octave < 3:
+			letter += ',' * (3 - octave)
+
+		return letter
+
 	def set(self, s):
 		m = self.RE_PITCH.match(s)
 
@@ -100,6 +117,14 @@ class NoteTest(unittest.TestCase):
 	def testSimpleSharp(self):
 		self.note.set('C#4')
 		self.assertEqual(int(self.note), 61)
+
+	def testToLilypond(self):
+		self.assertEqual(self.note.to_lilypond(), "c'")
+		self.note.set('C#4')
+		self.assertEqual(self.note.to_lilypond(), "cis'")
+		self.note.set('D1')
+		self.assertEqual(self.note.to_lilypond(), 'd,,')
+
 
 	def testIdentityInKeyOfC(self):
 		for octave in range(0, 9):
