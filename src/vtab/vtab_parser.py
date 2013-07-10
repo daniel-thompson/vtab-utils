@@ -1,4 +1,6 @@
-import re, unittest
+import shlex
+import re
+import unittest
 from vtab import tunings
 from note import Note
 
@@ -20,7 +22,6 @@ class VtabParser(object):
 	least four strings).
 	Template is: " | 10  |  9"'''
 	RE_NOTE = re.compile(r'^\s*[|0-9]+\s+[|0-9]+\s+[|0-9]+\s+[|0-9]+')
-
 
 	def __init__(self):
 		self.formatters = []
@@ -51,17 +52,24 @@ class VtabParser(object):
 		key = key.lower()
 		self.format_attribute(key, value)
 
-	def parse_decoration(self, decoration):
-		pass
+	def parse_decorations(self, decorations):
+		for token in decorations:
+			if token[0].isdigit():
+				self.format_attribute('duration', token)
+			else:
+				self.format_attribute('lyric', token)
 
 	def parse_barline(self, line):
-		self.format_barline(line)
+		tokens = shlex.split(line)
+		self.parse_decorations(tokens[1:])
+		self.format_barline(tokens[0])
 
 	def parse_note(self, note):
-		notes = note.split()
+		notes = shlex.split(note)
 
 		decorations = notes[len(self._tuning):]
 		notes = notes[0:len(self._tuning)]
+
 
 		def parse_string(open_string, fret):
 			try:
@@ -70,6 +78,7 @@ class VtabParser(object):
 				return None
 		notes = [ parse_string(open_string, fret) for (open_string, fret) in zip(self._tuning, notes) ]
 
+		self.parse_decorations(decorations)
 		self.format_note(tuple(notes))
 
 	def parse(self, s):
@@ -84,8 +93,7 @@ class VtabParser(object):
 				return
 
 			self.flush()
-			self.parse_decoration(barline.group(2))
-			self.parse_barline(barline.group(1))
+			self.parse_barline(s)
 			return
 
 		self.flush()
@@ -210,6 +218,14 @@ class VtabParserTest(unittest.TestCase):
 		self.formatter.history[0] = self.formatter.history[0][0:1]
 		self.expectHistory(('format_barline',))
 
+	def testDecoratedBarLine(self):
+		self.parser.parse('-------- 8 "Some-"')
+		self.expectHistory(('format_attribute', 'duration', '8'))
+		self.expectHistory(('format_attribute', 'lyric', 'Some-'))
+		# TODO: Need to check what type barline is (not yet implemented)
+		self.formatter.history[2] = self.formatter.history[2][0:1]
+		self.expectHistory(('format_barline',))
+
 	def testRepeatOpen(self):
 		self.parser.parse('=======:')
 		# TODO: Need to check what type barline is (not yet implemented)
@@ -221,7 +237,6 @@ class VtabParserTest(unittest.TestCase):
 		# TODO: Need to check what type barline is (not yet implemented)
 		self.formatter.history[0] = self.formatter.history[0][0:1]
 		self.expectHistory(('format_barline',))
-
 
 	def testRepeatCloseOpen(self):
 		self.parser.parse(':======:')
@@ -257,6 +272,11 @@ class VtabParserTest(unittest.TestCase):
 
 		self.parser.parse('12 14 14 13  12 12')
 		self.expectNote(  'E3 B3 E4 G#4 B4 E5')
+
+	def testDecoratedNotes(self):
+		self.parser.parse('|  | 14 |  |  |  8.')
+		self.expectHistory(('format_attribute', 'duration', '8.'))
+		self.expectNote (' X  X E4 X  X  X')
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
