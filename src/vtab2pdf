@@ -1,0 +1,8 @@
+#!/bin/sh
+
+PATH=$PATH:`dirname $0`
+
+for fname in "$@"
+do
+	vtab2ly $fname | lilypond -o `dirname $fname`/`basename $fname .vtab` -
+done
