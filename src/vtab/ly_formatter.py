@@ -2,7 +2,7 @@ import re, string, sys, unittest
 from vtab import tunings
 
 VERSION='''\
-\\version "2.12.0"
+\\version "2.16.0"
 '''
 HEADER=string.Template('''\
 \\header {
@@ -27,7 +27,7 @@ Melody = {
   \\voiceOne
   \\key ${key}
   \\time ${time}
-  ${melody}
+${melody}
 }
 ''')
 FINALIZE='''\
@@ -74,12 +74,10 @@ class LilypondFormatter(object):
 		self.f = sys.stdout
 		self.set_tuning(tunings.STANDARD_TUNING)
 
-		self._header = {}
-		self._finalized_header = False
-
 		self._attributes = {
 			'key' : 'c \\major',
-			'time' : '4/4'
+			'time' : '4/4',
+			'duration' : '8',
 		}
 
 		self._melody = []
@@ -90,13 +88,6 @@ class LilypondFormatter(object):
 	def set_tuning(self, tuning):
 		self._tuning = tuning
 
-	def _finalize_header(self):
-		if not self._finalized_header:
-			self.f.write(VERSION)
-			self.f.write(HEADER.safe_substitute(self._header))
-			self.f.write(PAPER)
-			self._finalized_header = True
-
 	def format_attribute(self, key, value):
 		try:
 			fn = getattr(self, 'format_' + key)
@@ -105,10 +96,16 @@ class LilypondFormatter(object):
 		if None != fn:
 			fn(value)
 		else:
-			self.f.write("ERROR: Unsupported attribute (%s: '%s')\n" % (key, value))
+			self.format_comment("ERROR: Unsupported attribute (%s: '%s')\n" % (key, value))
 
 	def format_comment(self, comment):
-		pass
+		# Force a line break if the last line does not have one
+		if len(self._melody) and not self._melody[-1].endswith('\n'):
+			self._melody.append('\n')
+		self._melody.append('% ' + comment + '\n')
+
+	def format_duration(self, duration):
+		self._duration = duration
 
 	def format_key(self, unused):
 		# For tab only output the key is not important
@@ -119,11 +116,10 @@ class LilypondFormatter(object):
 		pass
 
 	def format_title(self, title):
-		self._header['title'] = title
+		self._attributes['title'] = title
 
 	def format_barline(self, unused):
-		self._finalize_header()
-		self._melody.append('\n')
+		self._melody.append('|\n')
 
 	def format_note(self, notes):
 		ly_notes = []
@@ -131,14 +127,14 @@ class LilypondFormatter(object):
 			if note is None:
 				continue
 			ly_notes.append(note.to_lilypond() + '\\' + str(string))
-		self._melody.append('<' + (' '.join(ly_notes)) + '>8')
-
-		self._finalize_header()
-		# <fis,/6>4
-		pass
+		self._melody.append('<' + (' '.join(ly_notes)) + '>' + self._duration)
 
 	def flush(self):
 		self._attributes['melody'] = ' '.join(self._melody)
+
+		self.f.write(VERSION)
+		self.f.write(HEADER.safe_substitute(self._attributes))
+		self.f.write(PAPER)
 		self.f.write(MELODY.safe_substitute(self._attributes))
 		self.f.write(FINALIZE)
 
@@ -147,9 +143,10 @@ class MockWriter(object):
 		self.history = []
 		self.log = False
 	def write(self, s):
-		if self.log:
-			sys.stdout.write('output >>> ' + s)
-		self.history.append(('write', s.rstrip()))
+		for line in s.split('\n'):
+			if self.log:
+				sys.stdout.write('output >>> ' + line + '\n')
+			self.history.append(('write', line.rstrip()))
 
 	def __getattr__(self, name):
 		def mock(*args, **kwargs):
@@ -168,8 +165,7 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.formatter.set_file(self.writer)
 
 	def tearDown(self):
-		# Check for unexpected history
-		self.assertEqual(self.history_counter, len(self.writer.history))
+		pass
 
 	def expectRegex(self, r):
 		h = self.writer.history[self.history_counter]
@@ -180,24 +176,32 @@ class LilypondFormatterTest(unittest.TestCase):
 		ln = h[1]
 		self.assertTrue(re.search(r, ln))
 
+	def skipToRegex(self, r):
+		while self.history_counter < len(self.writer.history):
+			h = self.writer.history[self.history_counter]
+			if h[0] == 'write':
+				ln = h[1]
+				if re.search(r, ln):
+					return True
+
+			self.history_counter += 1
+
+		return False
+
 	def expectNoOutput(self):
 		self.assertEqual(self.history_counter, len(self.writer.history))
 
 	def testFormatAttributeTitle(self):
-		self.writer.log = True
 		title = 'Unit test title'
 		self.formatter.format_attribute('title', title)
-		self.expectNoOutput()
-		self.formatter.format_note(tunings.STANDARD_TUNING)
-		self.expectRegex('version')
-		self.expectRegex('title.*%s' % (title))
-		self.expectRegex('paper')
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex('title.*%s' % (title)))
 
-	def xtestFormatAttributeSimpleComment(self):
+	def testFormatAttributeSimpleComment(self):
 		comment = 'This is a comment'
 		self.formatter.format_attribute('comment', comment)
-		# Should self-flush because there are no staff text acculated
-		self.expectRegex('^# %s$' % (comment))
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex('^%% %s$' % (comment)))
 
 	def xtestFormatAttributeDelayedComment(self):
 		comment = 'This is a comment'
