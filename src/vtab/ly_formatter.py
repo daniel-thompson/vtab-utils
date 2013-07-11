@@ -27,7 +27,7 @@ Melody = {
   \\voiceOne
   \\key ${key}
   \\time ${time}
-${melody}
+  ${melody}
 }
 ''')
 FINALIZE='''\
@@ -123,14 +123,14 @@ class LilypondFormatter(object):
 
 	def format_note(self, notes):
 		ly_notes = []
-		for note, string in zip(notes, range(6, 1, -1)):
+		for note, string in zip(notes, range(6, 0, -1)):
 			if note is None:
 				continue
 			ly_notes.append(note.to_lilypond() + '\\' + str(string))
 		self._melody.append('<' + (' '.join(ly_notes)) + '>' + self._duration)
 
 	def flush(self):
-		self._attributes['melody'] = ' '.join(self._melody)
+		self._attributes['melody'] = '  '.join(self._melody)
 
 		self.f.write(VERSION)
 		self.f.write(HEADER.safe_substitute(self._attributes))
@@ -145,7 +145,7 @@ class MockWriter(object):
 	def write(self, s):
 		for line in s.split('\n'):
 			if self.log:
-				sys.stdout.write('output >>> ' + line + '\n')
+				sys.stdout.write('output >>> ' + line.rstrip() + '\n')
 			self.history.append(('write', line.rstrip()))
 
 	def __getattr__(self, name):
@@ -163,6 +163,7 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.history_counter = 0
 
 		self.formatter.set_file(self.writer)
+		self.formatter.format_attribute('duration', '4')
 
 	def tearDown(self):
 		pass
@@ -201,18 +202,22 @@ class LilypondFormatterTest(unittest.TestCase):
 		comment = 'This is a comment'
 		self.formatter.format_attribute('comment', comment)
 		self.formatter.flush()
-		self.assertTrue(self.skipToRegex('^%% %s$' % (comment)))
+		self.assertTrue(self.skipToRegex('^  %% %s$' % (comment)))
 
-	def xtestFormatAttributeDelayedComment(self):
+	def testFormatAttributeDelayedComment(self):
 		comment = 'This is a comment'
-		self.formatter.format_barline('unused')
+		chord = (None, None, 0, 2, None, None)
+		notes = tunings.chord(chord)
+
+		self.formatter.format_note(notes)
 		self.formatter.format_attribute('comment', comment)
-		self.expectNoOutput() # No output until flush
+		self.formatter.format_note(notes)
 		self.formatter.flush()
-		for dummy in tunings.STANDARD_TUNING:
-			self.expectRegex('^|$')
-		self.expectRegex('^# %s$' % (comment))
-		self.expectRegex('^$')
+
+		self.assertTrue(self.skipToRegex(r'^  <d\\4 a\\3>4$'))
+		self.expectRegex(r'^  <d\\4 a\\3>4$')
+		self.expectRegex(r'^  %% %s$' % (comment))
+		self.expectRegex(r'^  <d\\4 a\\3>4$')
 
 	def testFormatAttributeKey(self):
 		self.formatter.format_attribute('key', 'C')
@@ -222,9 +227,10 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.formatter.format_attribute('time', '4/4')
 		# No output expected (and tested for by tearDown() )
 
-	def xtestFormatAttributeUnknown(self):
+	def testFormatAttributeUnknown(self):
 		self.formatter.format_attribute('unknown', 'unknown')
-		self.expectRegex('Unsupported attribute')
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex('^  % ERROR.*Unsupported attribute'))
 
 	def xtestFormatBar(self):
 		self.formatter.format_barline('unused')
@@ -234,68 +240,31 @@ class LilypondFormatterTest(unittest.TestCase):
 			self.expectRegex('^|$')
 		self.expectRegex('^$')
 
-	def xtestFormatNoteWithUnfrettedStrum(self):
+	def testFormatNoteWithUnfrettedStrum(self):
 		self.formatter.format_note(tunings.STANDARD_TUNING)
-		self.expectNoOutput()
 		self.formatter.flush()
-		for dummy in tunings.STANDARD_TUNING:
-			self.expectRegex('^-0$')
-		self.expectRegex('^$')
+		self.assertTrue(self.skipToRegex(r"^  <e,\\6 a,\\5 d\\4 g\\3 b\\2 e'\\1>4$"))
 
-	def xtestFormatNoteBigEChord(self):
+	def testFormatNoteBigEChord(self):
 		chord = (0, 2, 2, 1, 0, 0)
 		notes = tunings.chord(chord)
 		self.formatter.format_note(notes)
-		self.expectNoOutput()
 		self.formatter.flush()
-		self.expectRegex('^-0$')
-		self.expectRegex('^-0$')
-		self.expectRegex('^-1$')
-		self.expectRegex('^-2$')
-		self.expectRegex('^-2$')
-		self.expectRegex('^-0$')
-		self.expectRegex('^$')
+		self.assertTrue(self.skipToRegex(r"^  <e,\\6 b,\\5 e\\4 gis\\3 b\\2 e'\\1>4$"))
 
-	def xtestFormatNoteDChord(self):
+	def testFormatNoteDChord(self):
 		chord = (None, None, 0, 2, 3, 2)
 		notes = tunings.chord(chord)
 		self.formatter.format_note(notes)
-		self.expectNoOutput()
 		self.formatter.flush()
-		self.expectRegex('^-2$')
-		self.expectRegex('^-3$')
-		self.expectRegex('^-2$')
-		self.expectRegex('^-0$')
-		self.expectRegex('^--$')
-		self.expectRegex('^--$')
-		self.expectRegex('^$')
+		self.assertTrue(self.skipToRegex(r"^  <d\\4 a\\3 d'\\2 fis'\\1>4$"))
 
-	def xtestFormatNoteNinthPositionBarre(self):
+	def testFormatNoteNinthPositionBarre(self):
 		chord = (9, 11, 11, 10, 9, 9)
 		notes = tunings.chord(chord)
 		self.formatter.format_note(notes)
-		self.expectNoOutput()
 		self.formatter.flush()
-		self.expectRegex('^--9$')
-		self.expectRegex('^--9$')
-		self.expectRegex('^-10$')
-		self.expectRegex('^-11$')
-		self.expectRegex('^-11$')
-		self.expectRegex('^--9$')
-		self.expectRegex('^$')
-
-	def xtestFormatNoteLineEndings(self):
-		for dummy in range(39):
-			self.formatter.format_note(tunings.STANDARD_TUNING)
-		self.expectNoOutput()
-		self.formatter.format_note(tunings.STANDARD_TUNING)
-		for dummy in tunings.STANDARD_TUNING:
-			self.expectRegex('^' + ('-0' * 39) + '$')
-		self.expectRegex('^$')
-		self.formatter.flush()
-		for dummy in tunings.STANDARD_TUNING:
-			self.expectRegex('^-0$')
-		self.expectRegex('^$')
+		self.assertTrue(self.skipToRegex(r"^  <cis\\6 gis\\5 cis'\\4 f'\\3 gis'\\2 cis''\\1>4$"))
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
