@@ -175,7 +175,8 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.assertEqual(len(h), 2)
 		self.assertEqual(h[0], 'write')
 		ln = h[1]
-		self.assertTrue(re.search(r, ln))
+		self.assertTrue(re.search(r, ln),
+			"'%s' does not match in '%s' at line %d" % (r, ln, self.history_counter))
 
 	def skipToRegex(self, r):
 		while self.history_counter < len(self.writer.history):
@@ -221,24 +222,33 @@ class LilypondFormatterTest(unittest.TestCase):
 
 	def testFormatAttributeKey(self):
 		self.formatter.format_attribute('key', 'C')
-		# No output expected (and tested for by tearDown() )
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex(r'\\key c \\major'))
 
 	def testFormatAttributeTime(self):
 		self.formatter.format_attribute('time', '4/4')
-		# No output expected (and tested for by tearDown() )
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex(r'\\time 4/4'))
 
 	def testFormatAttributeUnknown(self):
 		self.formatter.format_attribute('unknown', 'unknown')
 		self.formatter.flush()
 		self.assertTrue(self.skipToRegex('^  % ERROR.*Unsupported attribute'))
 
-	def xtestFormatBar(self):
+	def testFormatBar(self):
+		self.formatter.format_attribute('duration', '1')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_barline('unused')
-		self.expectNoOutput()
+		self.formatter.format_attribute('duration', '2')
+		self.formatter.format_note(tunings.chord((None, None, 0, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, 2, None, None, None)))
+		self.formatter.format_barline('unused')
 		self.formatter.flush()
-		for dummy in tunings.STANDARD_TUNING:
-			self.expectRegex('^|$')
-		self.expectRegex('^$')
+
+		r = r"^  <c\\5>1  [|]$"
+		self.assertTrue(self.skipToRegex(r))
+		self.expectRegex(r)
+		self.expectRegex(r"^  <d\\4>2  <e\\4>2  [|]$")
 
 	def testFormatNoteWithUnfrettedStrum(self):
 		self.formatter.format_note(tunings.STANDARD_TUNING)
@@ -246,23 +256,17 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.assertTrue(self.skipToRegex(r"^  <e,\\6 a,\\5 d\\4 g\\3 b\\2 e'\\1>4$"))
 
 	def testFormatNoteBigEChord(self):
-		chord = (0, 2, 2, 1, 0, 0)
-		notes = tunings.chord(chord)
-		self.formatter.format_note(notes)
+		self.formatter.format_note(tunings.chord((0, 2, 2, 1, 0, 0)))
 		self.formatter.flush()
 		self.assertTrue(self.skipToRegex(r"^  <e,\\6 b,\\5 e\\4 gis\\3 b\\2 e'\\1>4$"))
 
 	def testFormatNoteDChord(self):
-		chord = (None, None, 0, 2, 3, 2)
-		notes = tunings.chord(chord)
-		self.formatter.format_note(notes)
+		self.formatter.format_note(tunings.chord((None, None, 0, 2, 3, 2)))
 		self.formatter.flush()
 		self.assertTrue(self.skipToRegex(r"^  <d\\4 a\\3 d'\\2 fis'\\1>4$"))
 
 	def testFormatNoteNinthPositionBarre(self):
-		chord = (9, 11, 11, 10, 9, 9)
-		notes = tunings.chord(chord)
-		self.formatter.format_note(notes)
+		self.formatter.format_note(tunings.chord((9, 11, 11, 10, 9, 9)))
 		self.formatter.flush()
 		self.assertTrue(self.skipToRegex(r"^  <cis\\6 gis\\5 cis'\\4 f'\\3 gis'\\2 cis''\\1>4$"))
 
