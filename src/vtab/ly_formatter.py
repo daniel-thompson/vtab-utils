@@ -111,9 +111,18 @@ class LilypondFormatter(object):
 	def format_duration(self, duration):
 		self._duration = Fraction(1, int(duration))
 
-	def format_key(self, unused):
-		# For tab only output the key is not important
-		pass
+	def format_key(self, key):
+		assert(len(key) > 0)
+
+		letter = key[0].lower()
+
+		thingness = '\\major'
+		if len(key) == 2 and key[1] == 'm':
+			thingness = '\\minor'
+		elif len(key) >= 2:
+			self.format_comment("ERROR: Unsupported key ('%s')\n" % (key))
+
+		self._attributes['key'] = letter + ' ' + thingness
 
 	def format_time(self, unused):
 		# For tab only output the timing is not important
@@ -238,10 +247,24 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.expectRegex(r'^  %% %s$' % (comment))
 		self.expectRegex(r'^  <d\\4 a\\3>4$')
 
-	def testFormatAttributeKey(self):
+	def testFormatAttributeKeyDefault(self):
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex(r'\\key c \\major'))
+
+	def testFormatAttributeKeyCMajor(self):
 		self.formatter.format_attribute('key', 'C')
 		self.formatter.flush()
 		self.assertTrue(self.skipToRegex(r'\\key c \\major'))
+
+	def testFormatAttributeKeyAMajor(self):
+		self.formatter.format_attribute('key', 'A')
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex(r'\\key a \\major'))
+
+	def testFormatAttributeKeyBMinor(self):
+		self.formatter.format_attribute('key', 'Bm')
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex(r'\\key b \\minor'))
 
 	def testFormatAttributeTime(self):
 		self.formatter.format_attribute('time', '4/4')
