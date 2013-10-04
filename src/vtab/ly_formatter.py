@@ -150,8 +150,13 @@ class LilypondFormatter(object):
 
 	def _flush_current_note(self):
 		if self._note_len:
+			dot = ''
+			if self._note_len.numerator == 3:
+				self._note_len -= self._note_len/3
+				dot = '.'
+
 			assert(self._note_len.numerator == 1)
-			self._melody[-1] += str(self._note_len.denominator)
+			self._melody[-1] += str(self._note_len.denominator) + dot
 			self._note_len = Fraction(0, 1)
 
 	def flush(self):
@@ -375,6 +380,31 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.formatter.flush()
 
 		r = r"^  <c\\5>4  <c\\5>4  <c\\5>4  <c\\5>4  [|]$"
+		self.assertTrue(self.skipToRegex(r))
+		self.expectRegex(r)
+
+	def testDurationInferenceDottedCrotchet(self):
+		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '4')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+
+		self.formatter.format_barline('unused')
+
+		self.formatter.flush()
+
+		r = r"^  <c\\5>4.  <c\\5>4.  <c\\5>4  [|]$"
 		self.assertTrue(self.skipToRegex(r))
 		self.expectRegex(r)
 
