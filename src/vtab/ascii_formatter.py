@@ -41,6 +41,10 @@ class AsciiFormatter(object):
 		else:
 			self._comments.append(comment)
 
+	def format_duration(self, unused):
+		# For asciitab the duration is not important
+		pass
+
 	def format_key(self, unused):
 		# For tab only output the key is not important
 		pass
