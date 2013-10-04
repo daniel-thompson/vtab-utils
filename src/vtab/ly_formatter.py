@@ -1,5 +1,7 @@
 import re, string, sys, unittest
+from fractions import Fraction
 from vtab import tunings
+
 
 VERSION='''\
 \\version "2.16.0"
@@ -81,6 +83,7 @@ class LilypondFormatter(object):
 		}
 
 		self._melody = []
+		self._note_len = Fraction(0, 1)
 
 	def set_file(self, f):
 		self.f = f
@@ -100,12 +103,13 @@ class LilypondFormatter(object):
 
 	def format_comment(self, comment):
 		# Force a line break if the last line does not have one
+		self._flush_current_note()
 		if len(self._melody) and not self._melody[-1].endswith('\n'):
 			self._melody.append('\n')
 		self._melody.append('% ' + comment + '\n')
 
 	def format_duration(self, duration):
-		self._duration = duration
+		self._duration = Fraction(1, int(duration))
 
 	def format_key(self, unused):
 		# For tab only output the key is not important
@@ -119,6 +123,7 @@ class LilypondFormatter(object):
 		self._attributes['title'] = title
 
 	def format_barline(self, unused):
+		self._flush_current_note()
 		self._melody.append('|\n')
 
 	def format_note(self, notes):
@@ -127,9 +132,22 @@ class LilypondFormatter(object):
 			if note is None:
 				continue
 			ly_notes.append(note.to_lilypond() + '\\' + str(string))
-		self._melody.append('<' + (' '.join(ly_notes)) + '>' + self._duration)
+		if len(ly_notes):
+			self._flush_current_note()
+			self._melody.append('<' + (' '.join(ly_notes)) + '>')
+			self._note_len = self._duration
+		else:
+			self._note_len += self._duration
+
+	def _flush_current_note(self):
+		if self._note_len:
+			assert(self._note_len.numerator == 1)
+			self._melody[-1] += str(self._note_len.denominator)
+			self._note_len = Fraction(0, 1)
 
 	def flush(self):
+		self._flush_current_note()
+
 		self._attributes['melody'] = '  '.join(self._melody)
 
 		self.f.write(VERSION)
@@ -269,6 +287,105 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.formatter.format_note(tunings.chord((9, 11, 11, 10, 9, 9)))
 		self.formatter.flush()
 		self.assertTrue(self.skipToRegex(r"^  <cis\\6 gis\\5 cis'\\4 f'\\3 gis'\\2 cis''\\1>4$"))
+
+	def testDurationInferenceMinim(self):
+		self.formatter.format_attribute('duration', '2')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '4')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_barline('unused')
+
+		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_barline('unused')
+
+		self.formatter.flush()
+
+		r = r"^  <c\\5>2  <c\\5>2  [|]$"
+		self.assertTrue(self.skipToRegex(r))
+		self.expectRegex(r)
+		self.expectRegex(r)
+
+	def testDurationInferenceCrotchet(self):
+		self.formatter.format_attribute('duration', '4')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '32')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_barline('unused')
+
+		self.formatter.flush()
+
+		r = r"^  <c\\5>4  <c\\5>4  <c\\5>4  <c\\5>4  [|]$"
+		self.assertTrue(self.skipToRegex(r))
+		self.expectRegex(r)
+
+	def testDurationInferenceQuaver(self):
+		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '32')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_attribute('duration', '64')
+		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
+
+		self.formatter.format_barline('unused')
+
+		self.formatter.flush()
+
+		r = r"^  <c\\5>8  <c\\5>8  <c\\5>8  <c\\5>8  [|]$"
+		self.assertTrue(self.skipToRegex(r))
+		self.expectRegex(r)
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
