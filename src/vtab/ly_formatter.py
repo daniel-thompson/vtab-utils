@@ -114,15 +114,14 @@ class LilypondFormatter(object):
 	def format_key(self, key):
 		assert(len(key) > 0)
 
-		letter = key[0].lower()
+		tonality = ' \\major'
+		if key[-1] == 'm':
+			tonality = ' \\minor'
+			key = key[:-1]
 
-		thingness = '\\major'
-		if len(key) == 2 and key[1] == 'm':
-			thingness = '\\minor'
-		elif len(key) >= 2:
-			self.format_comment("ERROR: Unsupported key ('%s')\n" % (key))
+		scale = key.replace('#', 'is').replace('b', 'es').lower()
 
-		self._attributes['key'] = letter + ' ' + thingness
+		self._attributes['key'] = scale + tonality
 
 	def format_time(self, unused):
 		# For tab only output the timing is not important
@@ -270,6 +269,16 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.formatter.format_attribute('key', 'Bm')
 		self.formatter.flush()
 		self.assertTrue(self.skipToRegex(r'\\key b \\minor'))
+
+	def testFormatAttributeKeyASharpMajor(self):
+		self.formatter.format_attribute('key', 'A#')
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex(r'\\key ais \\major'))
+
+	def testFormatAttributeKeyBFlatMinor(self):
+		self.formatter.format_attribute('key', 'Bbm')
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex(r'\\key bes \\minor'))
 
 	def testFormatAttributeTime(self):
 		self.formatter.format_attribute('time', '4/4')
