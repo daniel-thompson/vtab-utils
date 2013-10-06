@@ -28,6 +28,7 @@ class VtabParser(object):
 		self.prev_line = None
 
 		self._tuning = tunings.STANDARD_TUNING
+		self._lineno = 0
 
 	def add_formatter(self, formatter):
 		if not formatter in self.formatters:
@@ -83,6 +84,7 @@ class VtabParser(object):
 
 	def parse(self, s):
 		'''Categorize the line and handle any error reporting.'''
+		self._lineno += 1
 		barline = self.RE_BARLINE.match(s)
 		if None != barline:
 			# Handle the special case of titles (meaning the barline is a actually
@@ -118,7 +120,8 @@ class VtabParser(object):
 
 	def flush(self):
 		if self.prev_line != None:
-			self.format_attribute("error", self.prev_line)
+			self.format_attribute("error", "Cannot parse '%s' at line %d" %
+					(self.prev_line, self._lineno-1))
 			self.prev_line = None
 
 	def parse_file(self, f):
@@ -174,6 +177,17 @@ class VtabParserTest(unittest.TestCase):
 		comment = '# This is a comment'
 		self.parser.parse(comment)
 		self.expectHistory(('format_attribute', 'comment', comment[2:]))
+
+	def testError(self):
+		self.parser.parse("===========")
+		self.parser.parse("| | | | | 0")
+		self.parser.parse("This is gibber")
+		self.parser.parse("| | | | | 0")
+
+		self.expectHistory(('format_barline', '==========='))
+		self.expectNote('X  X  X  X  X  E4')
+		self.expectHistory(('format_attribute', 'error', "Cannot parse 'This is gibber' at line 3"))
+		self.expectNote('X  X  X  X  X  E4')
 
 	def testUnderlinedTitle(self):
 		title = 'This is a title'
