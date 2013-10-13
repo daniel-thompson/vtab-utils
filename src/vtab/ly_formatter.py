@@ -8,7 +8,7 @@ VERSION='''\
 '''
 HEADER=string.Template('''\
 \\header {
-  title = "${title}"
+  title = ${title}
   tagline = ##f
 }
 ''')
@@ -77,6 +77,7 @@ class LilypondFormatter(object):
 		self.set_tuning(tunings.STANDARD_TUNING)
 
 		self._attributes = {
+			'title' : None,
 			'key' : 'c \\major',
 			'time' : '4/4',
 			'duration' : Fraction(1, 8),
@@ -138,7 +139,7 @@ class LilypondFormatter(object):
 			if note is None:
 				continue
 			ly_notes.append(note.to_lilypond() + '\\' + str(string))
-		
+
 		if 0 != len(ly_notes):
 			lynote = '<' + (' '.join(ly_notes)) + '>'
 		else:
@@ -151,11 +152,17 @@ class LilypondFormatter(object):
 			dot = ''
 		assert(duration.numerator == 1)
 		lyduration = str(duration.denominator) + dot
-				
+
 		self._melody.append(lynote + lyduration)
 
 	def flush(self):
 		self._attributes['melody'] = '  '.join(self._melody)
+
+		# Fixup the title if needed
+		if self._attributes['title'] and '"' not in self._attributes['title']:
+			self._attributes['title'] = '"' + self._attributes['title'] + '"'
+		else:
+			self._attributes['title'] = '##f'
 
 		self.f.write(VERSION)
 		self.f.write(HEADER.safe_substitute(self._attributes))
@@ -222,11 +229,17 @@ class LilypondFormatterTest(unittest.TestCase):
 	def expectNoOutput(self):
 		self.assertEqual(self.history_counter, len(self.writer.history))
 
+	def testFormatNoTitle(self):
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex('title.*##f'))
+
 	def testFormatAttributeTitle(self):
 		title = 'Unit test title'
 		self.formatter.format_attribute('title', title)
 		self.formatter.flush()
-		self.assertTrue(self.skipToRegex('title.*%s' % (title)))
+		# regex allows some change of formatting but does require that the title
+		# be wrapped up in double quotes
+		self.assertTrue(self.skipToRegex('title.*"%s"' % (title)))
 
 	def testFormatAttributeSimpleComment(self):
 		comment = 'This is a comment'
