@@ -30,6 +30,8 @@ class VtabParser(object):
 
 		self._tuning = tunings.STANDARD_TUNING
 		self._lineno = 0
+		self._duration = Fraction(1, 4)
+		self._note_len = Fraction(0, 1)
 
 	def add_formatter(self, formatter):
 		if not formatter in self.formatters:
@@ -46,9 +48,9 @@ class VtabParser(object):
 		for formatter in self.formatters:
 			formatter.format_barline(line)
 
-	def format_note(self, note):
+	def format_note(self, note, duration):
 		for formatter in self.formatters:
-			formatter.format_note(note)
+			formatter.format_note(note, duration)
 
 	def parse_keypair(self, key, value):
 		key = key.lower()
@@ -57,7 +59,8 @@ class VtabParser(object):
 	def parse_decorations(self, decorations):
 		for token in decorations:
 			if token[0].isdigit():
-				self.format_attribute('duration', Fraction(1, int(token)))
+				self._duration = Fraction(1, int(token))
+				self.format_attribute('duration', self._duration)
 			else:
 				self.format_attribute('lyric', token)
 
@@ -70,17 +73,25 @@ class VtabParser(object):
 		notes = shlex.split(note)
 
 		decorations = notes[len(self._tuning):]
-		notes = notes[0:len(self._tuning)]
+		self.parse_decorations(decorations)
 
 		def parse_string(open_string, fret):
 			try:
 				return open_string + int(fret)
 			except:
 				return None
+
+		notes = notes[0:len(self._tuning)]
 		notes = [ parse_string(open_string, fret) for (open_string, fret) in zip(self._tuning, notes) ]
 
-		self.parse_decorations(decorations)
-		self.format_note(tuple(notes))
+		if len(notes) != notes.count(None):
+			# New note starts
+			self._flush_current_note()
+			self._notes = tuple(notes)
+			self._note_len = self._duration
+		else:
+			# Note continues
+			self._note_len += self._duration
 
 	def parse(self, s):
 		'''Categorize the line and handle any error reporting.'''
@@ -94,11 +105,11 @@ class VtabParser(object):
 				self.prev_line = None
 				return
 
-			self.flush()
+			self._flush_prev_line()
 			self.parse_barline(s)
 			return
 
-		self.flush()
+		self._flush_prev_line()
 
 		comment = self.RE_COMMENT.match(s)
 		if None != comment:
@@ -118,11 +129,21 @@ class VtabParser(object):
 		if s.strip() != '': # not whitespace
 			self.prev_line = s
 
-	def flush(self):
+	def _flush_current_note(self):
+		if 0 != self._note_len:
+			self.format_note(self._notes, self._note_len)
+			self._note_len = Fraction(0, 1)
+			self._notes = None
+
+	def _flush_prev_line(self):
 		if self.prev_line != None:
 			self.format_attribute("error", "Cannot parse '%s' at line %d" %
 					(self.prev_line, self._lineno-1))
-			self.prev_line = None
+			self.prev_line = None		
+
+	def flush(self):
+		self._flush_current_note()
+		self._flush_prev_line()
 
 	def parse_file(self, f):
 		for ln in f.readlines():
@@ -160,18 +181,22 @@ class VtabParserTest(unittest.TestCase):
 		self.parser.flush()
 		self.assertEqual(len(self.formatter.history), self.history_counter)
 
+	def atomicParse(self, s):
+		self.parser.parse(s)
+		self.parser.flush()
+
 	def expectHistory(self, t):
 		self.assertTupleEqual(self.formatter.history[self.history_counter], t)
 		self.history_counter += 1
 
-	def expectNote(self, template):
+	def expectNote(self, template, duration=Fraction(1,4)):
 		def parse_note(note):
 			try:
 				return Note(note)
 			except:
 				return None
 		notes = [parse_note(note) for note in template.split()]
-		self.expectHistory(('format_note', tuple(notes)))
+		self.expectHistory(('format_note', tuple(notes), duration))
 
 	def testComment(self):
 		comment = '# This is a comment'
@@ -183,10 +208,14 @@ class VtabParserTest(unittest.TestCase):
 		self.parser.parse("| | | | | 0")
 		self.parser.parse("This is gibber")
 		self.parser.parse("| | | | | 0")
+		self.parser.flush()
 
 		self.expectHistory(('format_barline', '==========='))
-		self.expectNote('X  X  X  X  X  E4')
+		# TODO: The comment appearing before the note is a consequence of the
+		#       note length detection. The comment really ought to be delayed until after
+		#       the note stops.
 		self.expectHistory(('format_attribute', 'error', "Cannot parse 'This is gibber' at line 3"))
+		self.expectNote('X  X  X  X  X  E4')
 		self.expectNote('X  X  X  X  X  E4')
 
 	def testUnderlinedTitle(self):
@@ -259,38 +288,38 @@ class VtabParserTest(unittest.TestCase):
 		self.expectHistory(('format_barline',))
 
 	def testOpenStrings(self):
-		self.parser.parse('0 | | | | |')
+		self.atomicParse('0 | | | | |')
 		self.expectNote('E2  X  X  X  X  X')
 
-		self.parser.parse('| 0 | | | |')
+		self.atomicParse('| 0 | | | |')
 		self.expectNote(' X A2  X  X  X  X')
 
-		self.parser.parse('| | 0 | | |')
+		self.atomicParse('| | 0 | | |')
 		self.expectNote(' X  X D3  X  X  X')
 
-		self.parser.parse('| | | 0 | |')
+		self.atomicParse('| | | 0 | |')
 		self.expectNote(' X  X  X G3  X  X')
 
-		self.parser.parse('| | | | 0 |')
+		self.atomicParse('| | | | 0 |')
 		self.expectNote(' X  X  X  X B3  X')
 
-		self.parser.parse('| | | | | 0')
+		self.atomicParse('| | | | | 0')
 		self.expectNote(' X  X  X  X  X E4')
 
 	def testBigChords(self):
-		self.parser.parse(' 3  2  0  0  0  3')
+		self.atomicParse(' 3  2  0  0  0  3')
 		self.expectNote(  'G2 B2 D3 G3 B3 G4')
 
-		self.parser.parse(' |  3  2  0  1  0')
+		self.atomicParse(' |  3  2  0  1  0')
 		self.expectNote(  ' X C3 E3 G3 C4 E4')
 
-		self.parser.parse('12 14 14 13  12 12')
+		self.atomicParse('12 14 14 13  12 12')
 		self.expectNote(  'E3 B3 E4 G#4 B4 E5')
 
 	def testDecoratedNotes(self):
-		self.parser.parse('|  | 14 |  |  |  8')
+		self.atomicParse('|  | 14 |  |  |  8')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1, 8)))
-		self.expectNote (' X  X E4 X  X  X')
+		self.expectNote (' X  X E4 X  X  X', Fraction(1, 8))
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']

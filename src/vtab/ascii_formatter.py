@@ -74,7 +74,7 @@ class AsciiFormatter(object):
 			self.flush()
 			self.format_barline(unused)
 
-	def format_note(self, notes):
+	def format_note(self, notes, duration):
 		frets = []
 		for note, tuning in zip(notes, self._tuning):
 			if note == None:
