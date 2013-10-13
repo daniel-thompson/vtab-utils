@@ -1,6 +1,7 @@
 import shlex
 import re
 import unittest
+from fractions import Fraction
 from vtab import tunings
 from note import Note
 
@@ -21,7 +22,7 @@ class VtabParser(object):
 	a recogniser (based on all tabs being for instruments with at
 	least four strings).
 	Template is: " | 10  |  9"'''
-	RE_NOTE = re.compile(r'^\s*[|0-9]+\s+[|0-9]+\s+[|0-9]+\s+[|0-9]+')
+	RE_NOTE = re.compile(r'^\s*[|:0-9]+\s+[|:0-9]+\s+[|:0-9]+\s+[|:0-9]+')
 
 	def __init__(self):
 		self.formatters = []
@@ -56,7 +57,7 @@ class VtabParser(object):
 	def parse_decorations(self, decorations):
 		for token in decorations:
 			if token[0].isdigit():
-				self.format_attribute('duration', token)
+				self.format_attribute('duration', Fraction(1, int(token)))
 			else:
 				self.format_attribute('lyric', token)
 
@@ -70,7 +71,6 @@ class VtabParser(object):
 
 		decorations = notes[len(self._tuning):]
 		notes = notes[0:len(self._tuning)]
-
 
 		def parse_string(open_string, fret):
 			try:
@@ -234,7 +234,7 @@ class VtabParserTest(unittest.TestCase):
 
 	def testDecoratedBarLine(self):
 		self.parser.parse('-------- 8 "Some-"')
-		self.expectHistory(('format_attribute', 'duration', '8'))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1, 8)))
 		self.expectHistory(('format_attribute', 'lyric', 'Some-'))
 		# TODO: Need to check what type barline is (not yet implemented)
 		self.formatter.history[2] = self.formatter.history[2][0:1]
@@ -288,8 +288,8 @@ class VtabParserTest(unittest.TestCase):
 		self.expectNote(  'E3 B3 E4 G#4 B4 E5')
 
 	def testDecoratedNotes(self):
-		self.parser.parse('|  | 14 |  |  |  8.')
-		self.expectHistory(('format_attribute', 'duration', '8.'))
+		self.parser.parse('|  | 14 |  |  |  8')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1, 8)))
 		self.expectNote (' X  X E4 X  X  X')
 
 if __name__ == "__main__":

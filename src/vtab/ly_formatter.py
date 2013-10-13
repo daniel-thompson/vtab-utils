@@ -79,7 +79,7 @@ class LilypondFormatter(object):
 		self._attributes = {
 			'key' : 'c \\major',
 			'time' : '4/4',
-			'duration' : '8',
+			'duration' : Fraction(1, 8),
 		}
 
 		self._melody = []
@@ -109,7 +109,7 @@ class LilypondFormatter(object):
 		self._melody.append('% ' + comment + '\n')
 
 	def format_duration(self, duration):
-		self._duration = Fraction(1, int(duration))
+		self._duration = duration
 
 	def format_key(self, key):
 		assert(len(key) > 0)
@@ -194,7 +194,7 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.history_counter = 0
 
 		self.formatter.set_file(self.writer)
-		self.formatter.format_attribute('duration', '4')
+		self.formatter.format_attribute('duration', Fraction(1, 4))
 
 	def tearDown(self):
 		pass
@@ -291,10 +291,10 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.assertTrue(self.skipToRegex('^  % ERROR.*Unsupported attribute'))
 
 	def testFormatBar(self):
-		self.formatter.format_attribute('duration', '1')
+		self.formatter.format_attribute('duration', Fraction(1, 1))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_barline('unused')
-		self.formatter.format_attribute('duration', '2')
+		self.formatter.format_attribute('duration', Fraction(1, 2))
 		self.formatter.format_note(tunings.chord((None, None, 0, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, 2, None, None, None)))
 		self.formatter.format_barline('unused')
@@ -326,22 +326,22 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.assertTrue(self.skipToRegex(r"^  <cis\\6 gis\\5 cis'\\4 f'\\3 gis'\\2 cis''\\1>4$"))
 
 	def testDurationInferenceMinim(self):
-		self.formatter.format_attribute('duration', '2')
+		self.formatter.format_attribute('duration', Fraction(1, 2))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '4')
+		self.formatter.format_attribute('duration', Fraction(1, 4))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
 		self.formatter.format_barline('unused')
 
-		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_attribute('duration', Fraction(1, 8))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_attribute('duration', Fraction(1, 16))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
@@ -361,20 +361,20 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.expectRegex(r)
 
 	def testDurationInferenceCrotchet(self):
-		self.formatter.format_attribute('duration', '4')
+		self.formatter.format_attribute('duration', Fraction(1, 4))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_attribute('duration', Fraction(1, 8))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_attribute('duration', Fraction(1, 16))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '32')
+		self.formatter.format_attribute('duration', Fraction(1, 32))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
@@ -393,12 +393,12 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.expectRegex(r)
 
 	def testDurationInferenceDottedCrotchet(self):
-		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_attribute('duration', Fraction(1, 8))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_attribute('duration', Fraction(1, 16))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
@@ -406,7 +406,7 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '4')
+		self.formatter.format_attribute('duration', Fraction(1, 4))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 
 		self.formatter.format_barline('unused')
@@ -418,20 +418,20 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.expectRegex(r)
 
 	def testDurationInferenceQuaver(self):
-		self.formatter.format_attribute('duration', '8')
+		self.formatter.format_attribute('duration', Fraction(1, 8))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '16')
+		self.formatter.format_attribute('duration', Fraction(1, 16))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '32')
+		self.formatter.format_attribute('duration', Fraction(1, 32))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 
-		self.formatter.format_attribute('duration', '64')
+		self.formatter.format_attribute('duration', Fraction(1, 64))
 		self.formatter.format_note(tunings.chord((None, 3, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
 		self.formatter.format_note(tunings.chord((None, None, None, None, None, None)))
