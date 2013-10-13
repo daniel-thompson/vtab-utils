@@ -65,15 +65,14 @@ class VtabParser(object):
 				self.format_attribute('lyric', token)
 
 	def parse_barline(self, line):
+		self._flush_current_note()
 		tokens = shlex.split(line)
 		self.parse_decorations(tokens[1:])
 		self.format_barline(tokens[0])
 
 	def parse_note(self, note):
 		notes = shlex.split(note)
-
 		decorations = notes[len(self._tuning):]
-		self.parse_decorations(decorations)
 
 		def parse_string(open_string, fret):
 			try:
@@ -81,16 +80,20 @@ class VtabParser(object):
 			except:
 				return None
 
+		is_rest = ':' in notes
+
 		notes = notes[0:len(self._tuning)]
 		notes = [ parse_string(open_string, fret) for (open_string, fret) in zip(self._tuning, notes) ]
 
-		if len(notes) != notes.count(None):
+		if len(notes) != notes.count(None) or is_rest:
 			# New note starts
 			self._flush_current_note()
+			self.parse_decorations(decorations)
 			self._notes = tuple(notes)
 			self._note_len = self._duration
 		else:
 			# Note continues
+			self.parse_decorations(decorations)
 			self._note_len += self._duration
 
 	def parse(self, s):
@@ -139,7 +142,7 @@ class VtabParser(object):
 		if self.prev_line != None:
 			self.format_attribute("error", "Cannot parse '%s' at line %d" %
 					(self.prev_line, self._lineno-1))
-			self.prev_line = None		
+			self.prev_line = None
 
 	def flush(self):
 		self._flush_current_note()
@@ -188,6 +191,14 @@ class VtabParserTest(unittest.TestCase):
 	def expectHistory(self, t):
 		self.assertTupleEqual(self.formatter.history[self.history_counter], t)
 		self.history_counter += 1
+
+	def expectBarline(self, barline_type='-'):
+		# TODO: Eventually the parser/formatter interface will be changed and this
+		#       insanity will stop.
+		historic_barline = self.formatter.history[self.history_counter]
+		expected_barline = barline_type * len(historic_barline[1])
+
+		self.expectHistory(('format_barline', expected_barline))
 
 	def expectNote(self, template, duration=Fraction(1,4)):
 		def parse_note(note):
@@ -251,23 +262,36 @@ class VtabParserTest(unittest.TestCase):
 
 	def testSingleBarLine(self):
 		self.parser.parse('--------')
-		# TODO: Need to check what type barline is (not yet implemented)
-		self.formatter.history[0] = self.formatter.history[0][0:1]
-		self.expectHistory(('format_barline',))
+		self.expectBarline('-')
 
 	def testDoulbeBarLine(self):
 		self.parser.parse('========')
-		# TODO: Need to check what type barline is (not yet implemented)
-		self.formatter.history[0] = self.formatter.history[0][0:1]
-		self.expectHistory(('format_barline',))
+		self.expectBarline('=')
+
+	def testNoteBarLineInteraction(self):
+		self.parser.parse('========')
+		self.parser.parse('| | 0 | | | 2')
+		self.parser.parse('| | 0 | | |')
+		self.parser.parse('--------')
+		self.parser.parse('| | 0 | | |')
+		self.parser.parse('| | 0 | | |')
+		self.parser.parse('========')
+		self.parser.flush()
+
+		self.expectBarline('=')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
+		self.expectNote(' X  X D3  X  X  X', Fraction(1,2))
+		self.expectNote(' X  X D3  X  X  X', Fraction(1,2))
+		self.expectBarline('-')
+		self.expectNote(' X  X D3  X  X  X', Fraction(1,2))
+		self.expectNote(' X  X D3  X  X  X', Fraction(1,2))
+		self.expectBarline('=')
 
 	def testDecoratedBarLine(self):
 		self.parser.parse('-------- 8 "Some-"')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1, 8)))
 		self.expectHistory(('format_attribute', 'lyric', 'Some-'))
-		# TODO: Need to check what type barline is (not yet implemented)
-		self.formatter.history[2] = self.formatter.history[2][0:1]
-		self.expectHistory(('format_barline',))
+		self.expectBarline('-')
 
 	def testRepeatOpen(self):
 		self.parser.parse('=======:')
@@ -320,6 +344,126 @@ class VtabParserTest(unittest.TestCase):
 		self.atomicParse('|  | 14 |  |  |  8')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1, 8)))
 		self.expectNote (' X  X E4 X  X  X', Fraction(1, 8))
+
+	def testNoteDurationMinim(self):
+		self.parser.parse('-------------')
+		self.parser.parse(' | 3 | | | |  2')
+		self.parser.parse(' | 3 | | | |  4')
+		self.parser.parse(' | | | | | |')
+
+		self.parser.parse('-------------')
+		self.parser.parse(' | 3 | | | |  8')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | 3 | | | |  16')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+
+		self.parser.parse('-------------')
+		self.parser.flush()
+
+		self.expectBarline('-')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,2))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,4)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,2))
+
+		self.expectBarline('-')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,8)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,2))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,16)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,2))
+
+		self.expectBarline('-')
+
+	def testNoteDurationCrotchet(self):
+		self.parser.parse('-------------')
+		self.parser.parse(' | 3 | | | |  4')
+		self.parser.parse(' | 3 | | | |  8')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | 3 | | | |  16')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | 3 | | | |  32')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse('-------------')
+		self.parser.flush()
+
+		self.expectBarline('-')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,4)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,4))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,8)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,4))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,16)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,4))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,32)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,4))
+		self.expectBarline('-')
+
+	def testNoteDurationDottedCrotchet(self):
+		self.parser.parse('-------------')
+		self.parser.parse(' | 3 | | | |  8')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | 3 | | | |  16')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | 3 | | | |  4')
+		self.parser.parse('-------------')
+		self.parser.flush()
+
+		self.expectBarline('-')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,8)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(3,8))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,16)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(3,8))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,4)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,4))
+		self.expectBarline('-')
+
+	def testNoteDurationQuaver(self):
+		self.parser.parse(' | 3 | | | |  8')
+		self.parser.parse(' | 3 | | | |  16')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | 3 | | | |  32')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | 3 | | | |  64')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | | | |')
+		self.parser.flush()
+
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,8)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,16)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,32)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,64)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
+
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
