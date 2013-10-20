@@ -2,3 +2,10 @@
 .pydevproject
 *.pyc
 *.pyo
+.*.swp
+
+examples/*.pdf
+
+MANIFEST
+build/
+dist/
