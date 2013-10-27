@@ -1,9 +1,12 @@
+from __future__ import print_function
+
 import shlex
 import re
-import unittest
+import sys
+import traceback
+
 from fractions import Fraction
 from vtab import tunings
-from note import Note
 
 class VtabParser(object):
 	'''Match a barline (or underline), yielding barline and decoration
@@ -149,8 +152,16 @@ class VtabParser(object):
 		self._flush_prev_line()
 
 	def parse_file(self, f):
+		(self._lineno, saved_lineno) = (0, self._lineno)
 		for ln in f.readlines():
-			self.parse(ln.rstrip())
+			try:
+				self.parse(ln.rstrip())
+			except:
+				print('%s:%d:%d: Internal error (please file a bug report)' %
+						(f.name, self._lineno, 0), file=sys.stderr)
+				traceback.print_exc(file=sys.stderr)
+
 		self.flush()
 		for formatter in self.formatters:
 			formatter.flush()
+		self._lineno = saved_lineno
