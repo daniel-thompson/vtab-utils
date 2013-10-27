@@ -9,3 +9,4 @@ examples/*.pdf
 MANIFEST
 build/
 dist/
+riffs/

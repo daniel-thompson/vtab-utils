@@ -139,7 +139,7 @@ class VtabParser(object):
 		if 0 != self._note_len:
 			self.format_note(self._notes, self._note_len)
 			self._note_len = Fraction(0, 1)
-			self._notes = None
+			self._notes = (None,) * len(self._tuning)
 
 	def _flush_prev_line(self):
 		if self.prev_line != None:

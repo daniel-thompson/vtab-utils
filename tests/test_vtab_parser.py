@@ -311,6 +311,28 @@ class VtabParserTest(unittest.TestCase):
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,64)))
 		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
 
+	def testNoteCarriedOverBarline(self):
+		self.parser.parse(' -----------')
+		self.parser.parse(' | 3 | | | |  2')
+		self.parser.parse(' | | | 0 1 0')
+		self.parser.parse(' -----------')
+		self.parser.parse(' | | | | | |')
+		self.parser.parse(' | | | 0 1 0')
+		self.parser.parse(' -----------')
+		self.parser.flush()
+
+		self.expectBarline('-')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,2))
+		self.expectNote(' X  X  X G3 C4 E4', Fraction(1,2))
+		self.expectBarline('-')
+		# TODO: Really this should be a note continuation (slur) but that is
+		#       not supported yet
+		self.expectNote(' X  X  X  X  X  X', Fraction(1,2))
+		self.expectNote(' X  X  X G3 C4 E4', Fraction(1,2))
+		self.expectBarline('-')
+
+
 
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
