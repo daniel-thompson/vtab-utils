@@ -14,14 +14,25 @@ HEADER=string.Template('''\
 ''')
 PAPER='''\
 \\paper {
-  #(set-paper-size "a4")
+$(if (not (ly:get-option 'afive)) #{
+  \\paper {
+    #(set-paper-size "a4")
+    left-margin = 20
+    line-width = 180
+  }
+#}
+#{
+  \\paper {
+    #(set-paper-size "a5")
+    top-margin = 3
+    bottom-margin = 3
+    left-margin = 5
+    line-width = 140.5
+  }
+#})
 
   % Align the first line with everything else
   indent = #0
-
-  % A4 paper is 210mm, this gives a left margin of 20mm and right margin of 10mm
-  left-margin = 20 \\mm
-  line-width = 180 \\mm
 }
 '''
 MELODY=string.Template('''\
@@ -56,19 +67,35 @@ TabMelody  = {
   \\Melody
 }
 
-\\score {
-  <<
-    \\new StaffGroup = "Fingerstyle" <<
-      \\new Staff = "TraditionalStaff" <<
-        \\clef "treble_8"
-        \\context Voice = "Melody" { \\StaffMelody }
-      >>
-      \\new TabStaff = "TabStaff" <<
-        \\context TabVoice = "Melody" { \\TabMelody }
-      >>
+GuitarStaffAndTab = <<
+  \\new StaffGroup = "Guitar" <<
+    \\new Staff = "TraditionalStaff" <<
+      \\clef "treble_8"
+      \\context Voice = "Melody" { \\StaffMelody }
+    >>
+    \\new TabStaff = "TabStaff" <<
+      \\context TabVoice = "Melody" { \\TabMelody }
     >>
   >>
-}
+>>
+
+GuitarTabOnly = <<
+  \\new StaffGroup = "Guitar" <<
+    \\new TabStaff = "TabStaff" <<
+      \\context TabVoice = "Melody" { \TabMelody }
+    >>
+  >>
+>>
+
+Guitar =
+$(if (ly:get-option 'afive) #{
+\GuitarTabOnly
+#}
+#{
+\GuitarStaffAndTab
+#})
+
+\\score { \\Guitar }
 '''
 
 class LilypondFormatter(object):
