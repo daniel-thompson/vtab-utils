@@ -35,6 +35,7 @@ class VtabParser(object):
 		self._lineno = 0
 		self._duration = Fraction(1, 4)
 		self._note_len = Fraction(0, 1)
+		self._tied_note = False
 
 	def add_formatter(self, formatter):
 		if not formatter in self.formatters:
@@ -51,9 +52,9 @@ class VtabParser(object):
 		for formatter in self.formatters:
 			formatter.format_barline(line)
 
-	def format_note(self, note, duration):
+	def format_note(self, note, duration, tied):
 		for formatter in self.formatters:
-			formatter.format_note(note, duration)
+			formatter.format_note(note, duration, tied)
 
 	def parse_keypair(self, key, value):
 		lookup  = {
@@ -80,7 +81,7 @@ class VtabParser(object):
 			self.format_attribute('lyric', token)
 
 	def parse_barline(self, line):
-		self._flush_current_note()
+		self._flush_current_note(note_off=False)
 		tokens = shlex.split(line)
 		self.parse_decorations(tokens[1:])
 		self.format_barline(tokens[0])
@@ -147,11 +148,13 @@ class VtabParser(object):
 		if s.strip() != '': # not whitespace
 			self.prev_line = s
 
-	def _flush_current_note(self):
+	def _flush_current_note(self, note_off=True):
 		if 0 != self._note_len:
-			self.format_note(self._notes, self._note_len)
+			self.format_note(self._notes, self._note_len, self._tied_note)
 			self._note_len = Fraction(0, 1)
-			self._notes = (None,) * len(self._tuning)
+			if note_off:
+				self._notes = (None,) * len(self._tuning)
+		self._tied_note = not note_off
 
 	def _flush_prev_line(self):
 		if self.prev_line != None:

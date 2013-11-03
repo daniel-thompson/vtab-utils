@@ -111,6 +111,7 @@ class LilypondFormatter(object):
 		}
 
 		self._melody = []
+		self._melody_last_note = None
 		self._note_len = Fraction(0, 1)
 		self._text = None
 
@@ -168,7 +169,7 @@ class LilypondFormatter(object):
 	def format_barline(self, unused):
 		self._melody.append('|\n')
 
-	def format_note(self, notes, duration):
+	def format_note(self, notes, duration, tie):
 		ly_notes = []
 		for note, string in zip(notes, range(6, 0, -1)):
 			if note is None:
@@ -192,6 +193,11 @@ class LilypondFormatter(object):
 			lytext = '^"%s"' % self._text
 			self._text = None
 
+		if tie:
+			assert(None != self._melody_last_note)
+			assert(0 != len(ly_notes))
+			self._melody[self._melody_last_note] += '~'
+		self._melody_last_note = len(self._melody)
 		self._melody.append(lynote + lyduration + lytext)
 
 	def flush(self):

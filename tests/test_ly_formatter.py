@@ -35,9 +35,9 @@ class LilypondFormatterTest(unittest.TestCase):
 	def tearDown(self):
 		pass
 
-	def format_note(self, note, duration=Fraction(1, 4)):
+	def format_note(self, note, duration=Fraction(1, 4), tie=False):
 		'''A simple typing convenience to provide a default note length for tests.'''
-		self.formatter.format_note(note, duration)
+		self.formatter.format_note(note, duration, tie)
 
 	def expectRegex(self, r):
 		h = self.writer.history[self.history_counter]
@@ -262,6 +262,20 @@ class LilypondFormatterTest(unittest.TestCase):
 		r = r"^  <c\\5>8  <c\\5>8  <c\\5>8  <c\\5>8  [|]$"
 		self.assertTrue(self.skipToRegex(r))
 		self.expectRegex(r)
+
+	def testFormatTie(self):
+		self.format_note(tunings.chord((None, 3, None, None, None, None)), Fraction(1,4))
+		self.format_note(tunings.chord((None, 3, None, None, None, None)), Fraction(1,4), tie=True)
+		self.format_note(tunings.chord((None, 3, None, None, None, None)), Fraction(1,2))
+		self.formatter.format_barline('unused')
+		self.format_note(tunings.chord((None, 3, None, None, None, None)), Fraction(1,1), tie=True)
+		self.formatter.format_barline('unused')
+
+		self.formatter.flush()
+
+		self.assertTrue(self.skipToRegex(r"^  <"))
+		self.expectRegex(r"^  <c\\5>4~  <c\\5>4  <c\\5>2~  [|]$")
+		self.expectRegex(r"^  <c\\5>1  [|]$")
 
 	def testFormatOverText(self):
 		self.formatter.format_attribute('text', 'C')

@@ -8,6 +8,7 @@ class AsciiFormatter(object):
 		self.f = sys.stdout
 		self._staff_lines = ()
 		self._comments = []
+		self._pad = False
 
 		self.set_tuning(tunings.STANDARD_TUNING)
 
@@ -53,10 +54,19 @@ class AsciiFormatter(object):
 		# For tab only output the timing is not important
 		pass
 
+	def format_text(self, unused):
+		# TODO: Over-text is useful for tab but requires quite
+		# a lot of effort for, for now, this is not implemented.
+		pass
+
 	def format_title(self, title):
 		self.f.write(title + '\n')
 		self.f.write(('=' * len(title)) + '\n')
 		self.f.write('\n')
+
+	def format_composer(self, composer):
+		self.f.write('Composer: %s\n' % composer)
+		self._pad = True
 
 	def format_barline(self, unused):
 		width = len(''.join(self._staff_lines[0])) + 2
@@ -74,10 +84,10 @@ class AsciiFormatter(object):
 			self.flush()
 			self.format_barline(unused)
 
-	def format_note(self, notes, duration):
+	def format_note(self, notes, duration, tie):
 		frets = []
 		for note, tuning in zip(notes, self._tuning):
-			if note == None:
+			if note == None or tie:
 				frets.append('')
 			else:
 				fret = int(note - tuning)
@@ -90,6 +100,10 @@ class AsciiFormatter(object):
 			line.append(('-' * padding) + fret)
 
 	def flush(self):
+		if self._pad:
+			self.f.write('\n')
+			self._pad = False
+
 		issue_seperator = False
 		if len(self._staff_lines) > 0 and len(self._staff_lines[0]) > 0:
 			lastline = None

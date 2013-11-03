@@ -38,9 +38,9 @@ class AsciiFormatterTest(unittest.TestCase):
 		self.formatter.flush()
 		self.assertEqual(self.history_counter, len(self.writer.history))
 
-	def format_note(self, note, duration=Fraction(1, 4)):
+	def format_note(self, note, duration=Fraction(1, 4), tie=False):
 		'''A simple typing convenience to provide a default note length for tests.'''
-		self.formatter.format_note(note, duration)
+		self.formatter.format_note(note, duration, tie)
 
 	def expectRegex(self, r):
 		h = self.writer.history[self.history_counter]

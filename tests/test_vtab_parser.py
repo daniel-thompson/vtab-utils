@@ -31,8 +31,9 @@ class VtabParserTest(unittest.TestCase):
 		self.parser.flush()
 		self.assertEqual(len(self.formatter.history), self.history_counter)
 
-	def atomicParse(self, s):
-		self.parser.parse(s)
+	def parse(self, s):
+		for ln in s.split('\n'):
+			self.parser.parse(ln)
 		self.parser.flush()
 
 	def expectHistory(self, t):
@@ -47,14 +48,14 @@ class VtabParserTest(unittest.TestCase):
 
 		self.expectHistory(('format_barline', expected_barline))
 
-	def expectNote(self, template, duration=Fraction(1,4)):
+	def expectNote(self, template, duration=Fraction(1,4), tie=False):
 		def parse_note(note):
 			try:
 				return Note(note)
 			except:
 				return None
 		notes = [parse_note(note) for note in template.split()]
-		self.expectHistory(('format_note', tuple(notes), duration))
+		self.expectHistory(('format_note', tuple(notes), duration, tie))
 
 	def testComment(self):
 		comment = '# This is a comment'
@@ -159,36 +160,36 @@ class VtabParserTest(unittest.TestCase):
 		self.expectHistory(('format_barline',))
 
 	def testOpenStrings(self):
-		self.atomicParse('0 | | | | |')
+		self.parse('0 | | | | |')
 		self.expectNote('E2  X  X  X  X  X')
 
-		self.atomicParse('| 0 | | | |')
+		self.parse('| 0 | | | |')
 		self.expectNote(' X A2  X  X  X  X')
 
-		self.atomicParse('| | 0 | | |')
+		self.parse('| | 0 | | |')
 		self.expectNote(' X  X D3  X  X  X')
 
-		self.atomicParse('| | | 0 | |')
+		self.parse('| | | 0 | |')
 		self.expectNote(' X  X  X G3  X  X')
 
-		self.atomicParse('| | | | 0 |')
+		self.parse('| | | | 0 |')
 		self.expectNote(' X  X  X  X B3  X')
 
-		self.atomicParse('| | | | | 0')
+		self.parse('| | | | | 0')
 		self.expectNote(' X  X  X  X  X E4')
 
 	def testBigChords(self):
-		self.atomicParse(' 3  2  0  0  0  3')
+		self.parse(' 3  2  0  0  0  3')
 		self.expectNote(  'G2 B2 D3 G3 B3 G4')
 
-		self.atomicParse(' |  3  2  0  1  0')
+		self.parse(' |  3  2  0  1  0')
 		self.expectNote(  ' X C3 E3 G3 C4 E4')
 
-		self.atomicParse('12 14 14 13  12 12')
+		self.parse('12 14 14 13  12 12')
 		self.expectNote(  'E3 B3 E4 G#4 B4 E5')
 
 	def testDecoratedNotes(self):
-		self.atomicParse('|  | 14 |  |  |  8')
+		self.parse('|  | 14 |  |  |  8')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1, 8)))
 		self.expectNote (' X  X E4 X  X  X', Fraction(1, 8))
 
@@ -311,6 +312,36 @@ class VtabParserTest(unittest.TestCase):
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,64)))
 		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
 
+	def testNotesAndRests(self):
+		self.parse("""
+			| | | 2 1 1  16
+			| | | : : :
+			| | | 2 1 1
+			| | | : : :
+			| | | | | |
+			| | | | | |
+			| | | 2 1 1
+			| | | | | |
+			| | | | | |
+			| | | : : :
+			| | | | | |
+			| | | | | |
+			| | | 2 1 1
+			| | | | | |
+			| | | : : :
+			| | | | | |
+		""")
+
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,16)))
+		self.expectNote(' X  X  X A3 C4 F4', Fraction(1,16))
+		self.expectNote(' X  X  X  X  X  X', Fraction(1,16))
+		self.expectNote(' X  X  X A3 C4 F4', Fraction(1,16))
+		self.expectNote(' X  X  X  X  X  X', Fraction(3,16))
+		self.expectNote(' X  X  X A3 C4 F4', Fraction(3,16))
+		self.expectNote(' X  X  X  X  X  X', Fraction(3,16))
+		self.expectNote(' X  X  X A3 C4 F4', Fraction(2,16))
+		self.expectNote(' X  X  X  X  X  X', Fraction(2,16))
+
 	def testNoteCarriedOverBarline(self):
 		self.parser.parse(' -----------')
 		self.parser.parse(' | 3 | | | |  2')
@@ -326,9 +357,26 @@ class VtabParserTest(unittest.TestCase):
 		self.expectNote(' X C3  X  X  X  X', Fraction(1,2))
 		self.expectNote(' X  X  X G3 C4 E4', Fraction(1,2))
 		self.expectBarline('-')
-		# TODO: Really this should be a note continuation (slur) but that is
-		#       not supported yet
-		self.expectNote(' X  X  X  X  X  X', Fraction(1,2))
+		self.expectNote(' X  X  X G3 C4 E4', Fraction(1,2), True)
+		self.expectNote(' X  X  X G3 C4 E4', Fraction(1,2))
+		self.expectBarline('-')
+
+	def testNoteStoppedAtBarline(self):
+		self.parser.parse(' -----------')
+		self.parser.parse(' | 3 | | | |  2')
+		self.parser.parse(' | | | 0 1 0')
+		self.parser.parse(' -----------')
+		self.parser.parse(' | | | : : :')
+		self.parser.parse(' | | | 0 1 0')
+		self.parser.parse(' -----------')
+		self.parser.flush()
+
+		self.expectBarline('-')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,2))
+		self.expectNote(' X  X  X G3 C4 E4', Fraction(1,2))
+		self.expectBarline('-')
+		self.expectNote(' X  X  X  X  X  X', Fraction(1,2), False) # No tie
 		self.expectNote(' X  X  X G3 C4 E4', Fraction(1,2))
 		self.expectBarline('-')
 
