@@ -72,9 +72,22 @@ class LilypondFormatterTest(unittest.TestCase):
 		title = 'Unit test title'
 		self.formatter.format_attribute('title', title)
 		self.formatter.flush()
-		# regex allows some change of formatting but does require that the title
+		# regex allows for some evolution of formatting but does require that the title
 		# be wrapped up in double quotes
 		self.assertTrue(self.skipToRegex('title.*"%s"' % (title)))
+
+	def testFormatNoComposer(self):
+		self.formatter.flush()
+		self.assertTrue(self.skipToRegex('composer.*##f'))
+
+	def testFormatAttributeComposer(self):
+		title = 'Unit test composer'
+		self.formatter.format_attribute('composer', title)
+		self.formatter.flush()
+		# regex allows some change of formatting but does require that the title
+		# be wrapped up in double quotes
+		self.assertTrue(self.skipToRegex('composer.*"%s"' % (title)))
+
 
 	def testFormatAttributeSimpleComment(self):
 		comment = 'This is a comment'

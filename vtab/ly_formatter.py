@@ -9,6 +9,7 @@ VERSION='''\
 HEADER=string.Template('''\
 \\header {
   title = ${title}
+  composer = ${composer}
   tagline = ##f
 }
 ''')
@@ -104,7 +105,6 @@ class LilypondFormatter(object):
 		self.set_tuning(tunings.STANDARD_TUNING)
 
 		self._attributes = {
-			'title' : None,
 			'key' : 'c \\major',
 			'time' : '4/4',
 			'duration' : Fraction(1, 8),
@@ -135,6 +135,9 @@ class LilypondFormatter(object):
 		if len(self._melody) and not self._melody[-1].endswith('\n'):
 			self._melody.append('\n')
 		self._melody.append('% ' + comment + '\n')
+
+	def format_composer(self, composer):
+		self._attributes['composer'] = composer
 
 	def format_duration(self, duration):
 		self._duration = duration
@@ -194,11 +197,12 @@ class LilypondFormatter(object):
 	def flush(self):
 		self._attributes['melody'] = '  '.join(self._melody)
 
-		# Fixup the title if needed
-		if self._attributes['title'] and '"' not in self._attributes['title']:
-			self._attributes['title'] = '"' + self._attributes['title'] + '"'
-		else:
-			self._attributes['title'] = '##f'
+		# Fixup the header attributes if needed
+		for attr in ('title', 'composer'):
+			if attr in self._attributes and '"' not in self._attributes[attr]:
+				self._attributes[attr] = '"' + self._attributes[attr] + '"'
+			else:
+				self._attributes[attr] = '##f'
 
 		self.f.write(VERSION)
 		self.f.write(HEADER.safe_substitute(self._attributes))
