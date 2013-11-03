@@ -56,7 +56,12 @@ class VtabParser(object):
 			formatter.format_note(note, duration)
 
 	def parse_keypair(self, key, value):
+		lookup  = {
+			't' : 'text',
+		}
 		key = key.lower()
+		if key in lookup:
+			key = lookup[key]
 		self.format_attribute(key, value)
 
 	def parse_decorations(self, decorations):
@@ -64,8 +69,15 @@ class VtabParser(object):
 			if token[0].isdigit():
 				self._duration = Fraction(1, int(token))
 				self.format_attribute('duration', self._duration)
-			else:
-				self.format_attribute('lyric', token)
+				continue
+
+			keypair = self.RE_KEYPAIR.match(token)
+			if None != keypair:
+				self.parse_keypair(keypair.group(1), keypair.group(2))
+				continue
+
+			# else
+			self.format_attribute('lyric', token)
 
 	def parse_barline(self, line):
 		self._flush_current_note()

@@ -250,6 +250,27 @@ class LilypondFormatterTest(unittest.TestCase):
 		self.assertTrue(self.skipToRegex(r))
 		self.expectRegex(r)
 
+	def testFormatOverText(self):
+		self.formatter.format_attribute('text', 'C')
+		self.format_note(tunings.chord((None, 3, None, None, None, None)))
+
+		self.formatter.format_attribute('text', 'Dm')
+		self.format_note(tunings.chord((None, None, 0, None, None, None)))
+
+		self.formatter.format_attribute('text', 'Em')
+		self.format_note(tunings.chord((None, None, 2, None, None, None)))
+
+		self.formatter.format_attribute('text', 'F')
+		self.format_note(tunings.chord((None, None, 3, None, None, None)))
+
+		self.formatter.format_barline('unused')
+		self.formatter.flush()
+
+		r = r'^  <c\\5>4\^"C"  <d\\4>4\^"Dm"  <e\\4>4\^"Em"  <f\\4>4\^"F"  [|]$'
+		self.assertTrue(self.skipToRegex(r))
+		self.expectRegex(r)
+
+
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
 	unittest.main()

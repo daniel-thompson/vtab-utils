@@ -112,6 +112,7 @@ class LilypondFormatter(object):
 
 		self._melody = []
 		self._note_len = Fraction(0, 1)
+		self._text = None
 
 	def set_file(self, f):
 		self.f = f
@@ -150,6 +151,10 @@ class LilypondFormatter(object):
 
 		self._attributes['key'] = scale + tonality
 
+	def format_text(self, text):
+		assert(None == self._text)
+		self._text = text
+
 	def format_time(self, unused):
 		# For tab only output the timing is not important
 		pass
@@ -179,8 +184,12 @@ class LilypondFormatter(object):
 			dot = ''
 		assert(duration.numerator == 1)
 		lyduration = str(duration.denominator) + dot
+		lytext = ''
+		if self._text:
+			lytext = '^"%s"' % self._text
+			self._text = None
 
-		self._melody.append(lynote + lyduration)
+		self._melody.append(lynote + lyduration + lytext)
 
 	def flush(self):
 		self._attributes['melody'] = '  '.join(self._melody)
