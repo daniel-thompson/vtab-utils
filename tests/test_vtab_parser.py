@@ -57,10 +57,26 @@ class VtabParserTest(unittest.TestCase):
 		self.history_counter += 1
 
 	def expectBarline(self, barline_type='-'):
-		# TODO: Eventually the parser/formatter interface will be changed and this
-		#       insanity will stop.
-		historic_barline = self.formatter.history[self.history_counter]
-		expected_barline = barline_type * len(historic_barline[1])
+		expected_barline = None
+
+		if barline_type == '-':
+			expected_barline = {}
+		elif barline_type == '=':
+			expected_barline = { 'double': 'plain' }
+		elif barline_type == ':-':
+			expected_barline = { 'repeat': 'close' }
+		elif barline_type == '-:':
+			expected_barline = { 'repeat': 'open' }
+		elif barline_type == ':-:':
+			expected_barline = { 'repeat': 'both' }
+		elif barline_type == ':=':
+			expected_barline = { 'double': 'plain', 'repeat': 'close' }
+		elif barline_type == '=:':
+			expected_barline = { 'double': 'plain', 'repeat': 'open' }
+		elif barline_type == ':=:':
+			expected_barline = { 'double': 'plain', 'repeat': 'both' }
+
+		assert(None != expected_barline)
 
 		self.expectHistory(('format_barline', expected_barline))
 
@@ -85,7 +101,7 @@ class VtabParserTest(unittest.TestCase):
 		self.parser.parse("| | | | | 0")
 		self.parser.flush()
 
-		self.expectHistory(('format_barline', '==========='))
+		self.expectBarline('=')
 		# TODO: The comment appearing before the note is a consequence of the
 		#       note length detection. The comment really ought to be delayed until after
 		#       the note stops.
@@ -128,9 +144,25 @@ class VtabParserTest(unittest.TestCase):
 		self.parser.parse('--------')
 		self.expectBarline('-')
 
-	def testDoulbeBarLine(self):
+	def testDoubleBarLine(self):
 		self.parser.parse('========')
 		self.expectBarline('=')
+
+	def testDoubleRepeatBarLine(self):
+		self.parse("""
+		========:
+		| | 0 | | | 1
+		--------
+		| | 0 | | |
+		:=======
+		""")
+		
+		self.expectBarline('=:')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,1)))
+		self.expectNote(' X  X D3  X  X  X', Fraction(1,1))
+		self.expectBarline('-')
+		self.expectNote(' X  X D3  X  X  X', Fraction(1,1))
+		self.expectBarline(':=')	
 
 	def testNoteBarLineInteraction(self):
 		self.parser.parse('========')
@@ -158,22 +190,16 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('-')
 
 	def testRepeatOpen(self):
-		self.parser.parse('=======:')
-		# TODO: Need to check what type barline is (not yet implemented)
-		self.formatter.history[0] = self.formatter.history[0][0:1]
-		self.expectHistory(('format_barline',))
+		self.parse('--------:')
+		self.expectBarline('-:')
 
 	def testRepeatClose(self):
-		self.parser.parse(':=======')
-		# TODO: Need to check what type barline is (not yet implemented)
-		self.formatter.history[0] = self.formatter.history[0][0:1]
-		self.expectHistory(('format_barline',))
+		self.parser.parse(':-------')
+		self.expectBarline(':-')
 
 	def testRepeatCloseOpen(self):
-		self.parser.parse(':======:')
-		# TODO: Need to check what type barline is (not yet implemented)
-		self.formatter.history[0] = self.formatter.history[0][0:1]
-		self.expectHistory(('format_barline',))
+		self.parser.parse(':------:')
+		self.expectBarline(':-:')
 
 	def testOpenStrings(self):
 		self.parse('0 | | | | |')

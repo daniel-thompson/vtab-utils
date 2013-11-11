@@ -161,17 +161,46 @@ class LilypondFormatterTest(unittest.TestCase):
 	def testFormatBar(self):
 		self.formatter.format_attribute('duration', Fraction(1, 1))
 		self.format_note('X C3  X  X  X  X', Fraction(1, 1))
-		self.formatter.format_barline('unused')
+		self.formatter.format_barline({})
 		self.formatter.format_attribute('duration', Fraction(1, 2))
 		self.format_note('X  X  D3 X  X  X', Fraction(1,2))
 		self.format_note('X  X  E3 X  X  X', Fraction(1,2))
-		self.formatter.format_barline('unused')
+		self.formatter.format_barline({})
 		self.formatter.flush()
 
-		r = r"^  <c\\5>1  [|]$"
+		self.assertTrue(self.skipToRegex(r"^  <"))
+		self.expectRegex(r"^  <c\\5>1  [|]$")
+		self.expectRegex(r"^  <d\\4>2  <e\\4>2  [|]$")
+
+	def testFormatDoubleBar(self):
+		self.formatter.format_attribute('duration', Fraction(1, 1))
+		self.format_note('X C3  X  X  X  X', Fraction(1, 1))
+		self.formatter.format_barline({ 'double': 'plain' })
+		self.formatter.format_attribute('duration', Fraction(1, 2))
+		self.format_note('X  X  D3 X  X  X', Fraction(1,2))
+		self.format_note('X  X  E3 X  X  X', Fraction(1,2))
+		self.formatter.format_barline({ 'double': 'plain' })
+		self.formatter.flush()
+
+		self.assertTrue(self.skipToRegex(r"^  <"))
+		self.expectRegex(r"^  <c\\5>1  [|][|]$")
+		self.expectRegex(r"^  <d\\4>2  <e\\4>2  [|][|]$")
+
+	def testFormatRepeat(self):
+		self.formatter.format_attribute('duration', Fraction(1, 1))
+		self.format_note('X C3  X  X  X  X', Fraction(1, 1))
+		self.formatter.format_barline({ 'repeat' : 'open'})
+		self.formatter.format_attribute('duration', Fraction(1, 2))
+		self.format_note('X  X  D3 X  X  X', Fraction(1,2))
+		self.format_note('X  X  E3 X  X  X', Fraction(1,2))
+		self.formatter.format_barline({'repeat' : 'close'})
+		self.formatter.flush()
+
+		r = r"^  <c\\5>1  \\repeat volta 2 {$"
 		self.assertTrue(self.skipToRegex(r))
 		self.expectRegex(r)
-		self.expectRegex(r"^  <d\\4>2  <e\\4>2  [|]$")
+		self.expectRegex(r"^  <d\\4>2  <e\\4>2  }$")
+
 
 	def testFormatNoteWithUnfrettedStrum(self):
 		self.format_note(tunings.STANDARD_TUNING)

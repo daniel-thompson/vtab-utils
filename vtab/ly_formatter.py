@@ -114,6 +114,7 @@ class LilypondFormatter(object):
 		self._melody_last_note = None
 		self._note_len = Fraction(0, 1)
 		self._text = None
+		self._brace_count = 0
 
 	def set_file(self, f):
 		self.f = f
@@ -166,8 +167,31 @@ class LilypondFormatter(object):
 	def format_title(self, title):
 		self._attributes['title'] = title
 
-	def format_barline(self, unused):
-		self._melody.append('|\n')
+	def format_barline(self, attributes):
+		bar = '|'
+
+		if 'double' in attributes:
+			if attributes['double'] == 'plain':
+				bar = '||'
+			elif attributes['double'] == 'left':
+				bar = '.|'
+			elif attributes['double'] == 'right':
+				bar = '|.'
+			elif attributes['double'] == 'both':
+				bar = '.|.'
+				
+		# At present repeat attributes deliberately clobber double attributes		
+		if 'repeat' in attributes:
+			if attributes['repeat'] == 'open':
+				bar = '\\repeat volta 2 {'
+				self._brace_count += 1
+			elif attributes['repeat'] == 'close':
+				bar = '}'
+				self._brace_count -= 1
+			elif attributes['repeat'] == 'both':
+				bar = '} \\repeat volta 2 {'
+
+		self._melody.append(bar + '\n')
 
 	def format_note(self, notes, duration, tie):
 		ly_notes = []
@@ -182,12 +206,13 @@ class LilypondFormatter(object):
 			lynote = 'r'
 
 		if duration.numerator == 3:
-			duration -= duration/3
+			remaining_duration = duration - duration/3
 			dot = '.'
 		else:
+			remaining_duration = duration
 			dot = ''
-		assert(duration.numerator == 1)
-		lyduration = str(duration.denominator) + dot
+		assert(remaining_duration.numerator == 1)
+		lyduration = str(remaining_duration.denominator) + dot
 		lytext = ''
 		if self._text:
 			lytext = '^"%s"' % self._text
@@ -201,6 +226,11 @@ class LilypondFormatter(object):
 		self._melody.append(lynote + lyduration + lytext)
 
 	def flush(self):
+		while self._brace_count > 0:
+			self._melody.append('}')
+			self._brace_count -= 1
+		assert(self._brace_count >= 0)
+
 		self._attributes['melody'] = '  '.join(self._melody)
 
 		# Fixup the header attributes if needed

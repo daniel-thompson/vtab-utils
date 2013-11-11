@@ -25,7 +25,7 @@ class VtabParser(object):
 	a recogniser (based on all tabs being for instruments with at
 	least four strings).
 	Template is: " | 10  |  9"'''
-	RE_NOTE = re.compile(r'^\s*[|:0-9]+\s+[|:0-9]+\s+[|:0-9]+\s+[|:0-9]+')
+	RE_NOTE = re.compile(r'^\s*[|:0-9\-]+\s+[|:0-9\-]+\s+[|:0-9\-]+\s+[|:0-9\-]+')
 
 	def __init__(self):
 		self.formatters = []
@@ -84,7 +84,34 @@ class VtabParser(object):
 		self._flush_current_note(note_off=False)
 		tokens = shlex.split(line)
 		self.parse_decorations(tokens[1:])
-		self.format_barline(tokens[0])
+
+		properties = {}
+
+		barline = tokens[0]
+		num_special = min(2, int(len(barline) / 2))
+		prefix = barline[:num_special]
+		postfix = barline[-num_special:]
+
+		if '=' in barline:
+			properties['double'] = 'plain'
+
+		if ':' in prefix:
+			properties['repeat'] = 'close'
+		if ':' in postfix:
+			if 'repeat' in properties:
+				properties['repeat'] = 'both'
+			else:
+				properties['repeat'] = 'open'
+
+		if '|' in prefix:
+			properties['double'] = 'left'
+		if '|' in prefix:
+			if 'double' in properties and properties['double'] == 'left':
+				properties['double'] = 'both'
+			else:
+				properties['double'] = 'right'
+
+		self.format_barline(properties)
 
 	def parse_note(self, note):
 		notes = shlex.split(note)
@@ -92,6 +119,7 @@ class VtabParser(object):
 
 		def parse_string(open_string, fret):
 			try:
+				fret = fret.strip('-') # Fake voice support
 				return open_string + int(fret)
 			except:
 				return None
@@ -167,6 +195,7 @@ class VtabParser(object):
 		self._flush_prev_line()
 
 	def parse_file(self, f):
+		num_errors = 0
 		(self._lineno, saved_lineno) = (0, self._lineno)
 		for ln in f.readlines():
 			try:
@@ -174,9 +203,12 @@ class VtabParser(object):
 			except:
 				print('%s:%d:%d: Internal error (please file a bug report)' %
 						(f.name, self._lineno, 0), file=sys.stderr)
+				num_errors += 1
 				traceback.print_exc(file=sys.stderr)
 
 		self.flush()
 		for formatter in self.formatters:
 			formatter.flush()
 		self._lineno = saved_lineno
+
+		return num_errors
