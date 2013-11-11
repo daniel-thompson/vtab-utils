@@ -1,6 +1,8 @@
+import StringIO
 import unittest
 from fractions import Fraction
-from vtab.vtab_parser import VtabParser
+
+import vtab
 from vtab.note import Note
 
 class MockFormatter(object):
@@ -17,9 +19,23 @@ class MockFormatter(object):
 
 class VtabParserTest(unittest.TestCase):
 	def setUp(self):
-		self.parser = VtabParser()
+		self.parser = vtab.VtabParser()
 		self.formatter = MockFormatter()
 		self.parser.add_formatter(self.formatter)
+
+		# This loop adds *all* the formatters to the parser during
+		# the parser unit tests. Strictly speaking this is not within
+		# the scope of unit tests but it has very little impact on the
+		# behaviour of the parser but allows us (for free) to check
+		# that the formatters don't react to formatting commands by
+		# raising an exception.
+		for fmt in (vtab.AsciiFormatter(),
+			    vtab.DummyFormatter(),
+			    vtab.LilypondFormatter()):
+			sio = StringIO.StringIO()
+			fmt.set_file(sio)
+			self.parser.add_formatter(fmt)
+
 		self.assertEqual(len(self.formatter.history), 0)
 		self.history_counter = 0
 
