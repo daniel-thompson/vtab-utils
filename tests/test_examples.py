@@ -11,6 +11,7 @@ output through that tool and check the return code.
 """
 import glob
 import StringIO
+import subprocess
 import unittest
 
 import vtab
@@ -48,15 +49,27 @@ class ExampleTestCase(ParametrizedTestCase):
 		num_errors = p.parse_file(f)
 		f.close()
 		self.assertEqual(0, num_errors, "%s did not parse cleanly" % self.param)
+		return sio
 
 	def testAsciiFormatter(self):
-		self.doParse(vtab.AsciiFormatter())
+		unused_io = self.doParse(vtab.AsciiFormatter())
 
 	def testDummyFormatter(self):
-		self.doParse(vtab.DummyFormatter())
+		unused_io = self.doParse(vtab.DummyFormatter())
 
 	def testLyFormatter(self):
-		self.doParse(vtab.LilypondFormatter())
+		msg = ('Lilypond %s whilst processing ' + self.param +
+		       ' (try running vtab2pdf on this file)')
+
+		lyio = self.doParse(vtab.LilypondFormatter())
+		lysub = subprocess.Popen(('lilypond', '-'),
+				stdin=subprocess.PIPE,
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE)
+		(out, err) = lysub.communicate(lyio.getvalue())
+		self.assertEqual(0, lysub.returncode)
+		for s in ('error', 'warning'):
+			self.assertNotIn(s, out+err, msg % s)
 
 def load_tests(loader, tests, pattern):
 	suite = unittest.TestSuite()
