@@ -91,25 +91,33 @@ class VtabParserTest(unittest.TestCase):
 
 	def testComment(self):
 		comment = '# This is a comment'
-		self.parser.parse(comment)
+		self.parse(comment)
 		self.expectHistory(('format_attribute', 'comment', comment[2:]))
 
 	def testError(self):
-		self.parser.parse("===========")
-		self.parser.parse("| | | | | 0")
-		self.parser.parse("This is gibber")
-		self.parser.parse("| | | | | 0")
-		self.parser.flush()
+		self.parse("""
+		===========
+		| | | | | 0
+		This is gibber
+		| | | | | 0
+		""")
 
 		self.expectBarline('=')
 		# TODO: The comment appearing before the note is a consequence of the
 		#       note length detection. The comment really ought to be delayed until after
 		#       the note stops.
-		self.expectHistory(('format_attribute', 'error', "Cannot parse 'This is gibber' at line 3"))
+		self.expectHistory(('format_attribute', 'error', "Cannot parse '\t\tThis is gibber' at line 4"))
 		self.expectNote('X  X  X  X  X  E4')
 		self.expectNote('X  X  X  X  X  E4')
 
 	def testUnderlinedTitle(self):
+		"""Check that a title line is not prematurely issued to the formatter.
+
+		A title can be demarked by its underlining. Therefore is cannot be
+		issued to the formatter until the next line has been parsed.
+
+		Note: This implies that we cannot use the self.parse() helper function.
+		"""
 		title = 'This is a title'
 		self.parser.parse(title)
 		self.assertEqual(len(self.formatter.history), 0)
@@ -119,12 +127,12 @@ class VtabParserTest(unittest.TestCase):
 
 	def testKeyPairTitle(self):
 		title = 'This is a title'
-		self.parser.parse('title: ' + title)
+		self.parse('title: ' + title)
 		self.expectHistory(('format_attribute', 'title', title))
 
 	def testKeyPairCaseNormalization(self):
 		title = 'This is a title'
-		self.parser.parse('Title: ' + title)
+		self.parse('Title: ' + title)
 		self.expectHistory(('format_attribute', 'title', title))
 
 		self.parser.parse('TITLE: ' + title)
@@ -132,20 +140,20 @@ class VtabParserTest(unittest.TestCase):
 
 	def testKeyPairWithoutWhitespace(self):
 		title = 'This is a title'
-		self.parser.parse('title:' + title)
+		self.parse('title:' + title)
 		self.expectHistory(('format_attribute', 'title', title))
 
 	def testKeyPairWithExcessiveWhitespace(self):
 		title = 'This is a title'
-		self.parser.parse('\ttitle  : \t ' + title)
+		self.parse('\ttitle  : \t ' + title)
 		self.expectHistory(('format_attribute', 'title', title))
 
 	def testSingleBarLine(self):
-		self.parser.parse('--------')
+		self.parse('--------')
 		self.expectBarline('-')
 
 	def testDoubleBarLine(self):
-		self.parser.parse('========')
+		self.parse('========')
 		self.expectBarline('=')
 
 	def testDoubleRepeatBarLine(self):
@@ -156,23 +164,24 @@ class VtabParserTest(unittest.TestCase):
 		| | 0 | | |
 		:=======
 		""")
-		
+
 		self.expectBarline('=:')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,1)))
 		self.expectNote(' X  X D3  X  X  X', Fraction(1,1))
 		self.expectBarline('-')
 		self.expectNote(' X  X D3  X  X  X', Fraction(1,1))
-		self.expectBarline(':=')	
+		self.expectBarline(':=')
 
 	def testNoteBarLineInteraction(self):
-		self.parser.parse('========')
-		self.parser.parse('| | 0 | | | 2')
-		self.parser.parse('| | 0 | | |')
-		self.parser.parse('--------')
-		self.parser.parse('| | 0 | | |')
-		self.parser.parse('| | 0 | | |')
-		self.parser.parse('========')
-		self.parser.flush()
+		self.parse("""
+		===========
+		| | 0 | | |  2
+		| | 0 | | |
+		-----------
+		| | 0 | | |
+		| | 0 | | |
+		===========
+		""")
 
 		self.expectBarline('=')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
@@ -184,7 +193,7 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('=')
 
 	def testDecoratedBarLine(self):
-		self.parser.parse('-------- 8 "Some-"')
+		self.parse('-------- 8 "Some-"')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1, 8)))
 		self.expectHistory(('format_attribute', 'lyric', 'Some-'))
 		self.expectBarline('-')
@@ -194,11 +203,11 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('-:')
 
 	def testRepeatClose(self):
-		self.parser.parse(':-------')
+		self.parse(':-------')
 		self.expectBarline(':-')
 
 	def testRepeatCloseOpen(self):
-		self.parser.parse(':------:')
+		self.parse(':------:')
 		self.expectBarline(':-:')
 
 	def testOpenStrings(self):
@@ -236,27 +245,26 @@ class VtabParserTest(unittest.TestCase):
 		self.expectNote (' X  X E4 X  X  X', Fraction(1, 8))
 
 	def testNoteDurationMinim(self):
-		self.parser.parse('-------------')
-		self.parser.parse(' | 3 | | | |  2')
-		self.parser.parse(' | 3 | | | |  4')
-		self.parser.parse(' | | | | | |')
-
-		self.parser.parse('-------------')
-		self.parser.parse(' | 3 | | | |  8')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | 3 | | | |  16')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-
-		self.parser.parse('-------------')
-		self.parser.flush()
+		self.parse("""
+		-------------
+		 | 3 | | | |  2
+		 | 3 | | | |  4
+		 | | | | | |
+		-------------
+		 | 3 | | | |  8
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | 3 | | | |  16
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		-------------
+		""")
 
 		self.expectBarline('-')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
@@ -273,24 +281,25 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('-')
 
 	def testNoteDurationCrotchet(self):
-		self.parser.parse('-------------')
-		self.parser.parse(' | 3 | | | |  4')
-		self.parser.parse(' | 3 | | | |  8')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | 3 | | | |  16')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | 3 | | | |  32')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse('-------------')
-		self.parser.flush()
+		self.parse("""
+		-------------)
+		 | 3 | | | |  4
+		 | 3 | | | |  8
+		 | | | | | |
+		 | 3 | | | |  16
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | 3 | | | |  32
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		-------------
+		""")
 
 		self.expectBarline('-')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,4)))
@@ -304,19 +313,20 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('-')
 
 	def testNoteDurationDottedCrotchet(self):
-		self.parser.parse('-------------')
-		self.parser.parse(' | 3 | | | |  8')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | 3 | | | |  16')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | 3 | | | |  4')
-		self.parser.parse('-------------')
-		self.parser.flush()
+		self.parse("""
+		-------------
+		 | 3 | | | |   8
+		 | | | | | |
+		 | | | | | |
+		 | 3 | | | |  16
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | 3 | | | |   4
+		-------------
+		""")
 
 		self.expectBarline('-')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,8)))
@@ -328,22 +338,23 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('-')
 
 	def testNoteDurationQuaver(self):
-		self.parser.parse(' | 3 | | | |  8')
-		self.parser.parse(' | 3 | | | |  16')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | 3 | | | |  32')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | 3 | | | |  64')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | | | |')
-		self.parser.flush()
+		self.parse("""
+		 | 3 | | | |   8
+		 | 3 | | | |  16
+		 | | | | | |
+		 | 3 | | | |  32
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | 3 | | | |  64
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		 | | | | | |
+		""")
 
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,8)))
 		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
@@ -385,14 +396,15 @@ class VtabParserTest(unittest.TestCase):
 		self.expectNote(' X  X  X  X  X  X', Fraction(2,16))
 
 	def testNoteCarriedOverBarline(self):
-		self.parser.parse(' -----------')
-		self.parser.parse(' | 3 | | | |  2')
-		self.parser.parse(' | | | 0 1 0')
-		self.parser.parse(' -----------')
-		self.parser.parse(' | | | | | |')
-		self.parser.parse(' | | | 0 1 0')
-		self.parser.parse(' -----------')
-		self.parser.flush()
+		self.parse("""
+		 -----------
+		 | 3 | | | |  2
+		 | | | 0 1 0
+		 -----------
+		 | | | | | |
+		 | | | 0 1 0
+		 -----------
+		""")
 
 		self.expectBarline('-')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
@@ -404,14 +416,15 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('-')
 
 	def testNoteStoppedAtBarline(self):
-		self.parser.parse(' -----------')
-		self.parser.parse(' | 3 | | | |  2')
-		self.parser.parse(' | | | 0 1 0')
-		self.parser.parse(' -----------')
-		self.parser.parse(' | | | : : :')
-		self.parser.parse(' | | | 0 1 0')
-		self.parser.parse(' -----------')
-		self.parser.flush()
+		self.parse("""
+		 -----------
+		 | 3 | | | |  2
+		 | | | 0 1 0
+		 -----------
+		 | | | : : :
+		 | | | 0 1 0
+		 -----------
+		""")
 
 		self.expectBarline('-')
 		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
@@ -423,23 +436,24 @@ class VtabParserTest(unittest.TestCase):
 		self.expectBarline('-')
 
 	def testOverText(self):
-		self.parser.parse(' -----------')
-		self.parser.parse(' | 3 | | | |  t:C')
-		self.parser.parse(' | | | 0 1 0')
-		self.parser.parse(' | | 2 | | |')
-		self.parser.parse(' | | | 0 1 0')
-		self.parser.parse(' -----------')
-		self.parser.parse(' 3 | | | | |  text:G')
-		self.parser.parse(' | | | 0 0 3')
-		self.parser.parse(' | | 0 | | |')
-		self.parser.parse(' | | | 0 0 3')
-		self.parser.parse(' -----------')
-		self.parser.parse(' 1 | | | | |  text:(F)')
-		self.parser.parse(' 1 | | | | |  "text:Two words"')
-		self.parser.parse(' 1 | | | | |  text:"Different quoting"')
-		self.parser.parse(" 0 | | | | |  text:'Em'")
-		self.parser.parse(' -----------')
-		self.parser.flush()
+		self.parse("""
+		 -----------
+		 | 3 | | | |  t:C
+		 | | | 0 1 0
+		 | | 2 | | |
+		 | | | 0 1 0
+		 -----------
+		 3 | | | | |  text:G
+		 | | | 0 0 3
+		 | | 0 | | |
+		 | | | 0 0 3
+		 -----------
+		 1 | | | | |  text:(F)
+		 1 | | | | |  "text:Two words"
+		 1 | | | | |  text:"Different quoting"
+		 0 | | | | |  text:'Em'
+		 -----------
+		""")
 
 		self.expectBarline('-')
 		self.expectHistory(('format_attribute', 'text', 'C'))
