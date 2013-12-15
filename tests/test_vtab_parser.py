@@ -395,6 +395,30 @@ class VtabParserTest(unittest.TestCase):
 		self.expectNote(' X  X  X A3 C4 F4', Fraction(2,16))
 		self.expectNote(' X  X  X  X  X  X', Fraction(2,16))
 
+        def testRestAtStartOfLine(self):
+		self.parse("""
+			-----------
+			| | | | | |  2
+			3 | 0 0 0 3
+			-----------
+			3 | 0 0 0 3
+			3 | 0 0 0 3
+			-----------
+		""")
+
+		self.expectBarline('-')
+
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,2)))
+		self.expectNote(' X  X  X  X  X  X', Fraction(1, 2))
+		self.expectNote('G2  X D3 G3 B3 G4', Fraction(1, 2))
+
+		self.expectBarline('-')
+
+		self.expectNote('G2  X D3 G3 B3 G4', Fraction(1, 2))
+		self.expectNote('G2  X D3 G3 B3 G4', Fraction(1, 2))
+
+		self.expectBarline('-')
+
 	def testNoteCarriedOverBarline(self):
 		self.parse("""
 		 -----------

@@ -32,7 +32,10 @@ class VtabParser(object):
 		self.prev_line = None
 
 		self._tuning = tunings.STANDARD_TUNING
+		self._notes = (None,) * len(self._tuning)
+
 		self._lineno = 0
+		self._barno = 0
 		self._duration = Fraction(1, 4)
 		self._note_len = Fraction(0, 1)
 		self._tied_note = False
@@ -81,7 +84,9 @@ class VtabParser(object):
 			self.format_attribute('lyric', token)
 
 	def parse_barline(self, line):
-		self._flush_current_note(note_off=False)
+		self._flush_current_note(new_bar=(self._barno >= 1))
+		self._barno += 1
+
 		tokens = shlex.split(line)
 		self.parse_decorations(tokens[1:])
 
@@ -176,13 +181,15 @@ class VtabParser(object):
 		if s.strip() != '': # not whitespace
 			self.prev_line = s
 
-	def _flush_current_note(self, note_off=True):
+	def _flush_current_note(self, new_bar=False):
 		if 0 != self._note_len:
+			if None == self._notes:
+				self._notes = (None,) * len(self._tuning)
 			self.format_note(self._notes, self._note_len, self._tied_note)
 			self._note_len = Fraction(0, 1)
-			if note_off:
+			if not new_bar:
 				self._notes = (None,) * len(self._tuning)
-		self._tied_note = not note_off
+		self._tied_note = new_bar
 
 	def _flush_prev_line(self):
 		if self.prev_line != None:
