@@ -1,5 +1,6 @@
 import re, string, sys, unittest
 from fractions import Fraction
+import vtab.note
 from vtab import tunings
 
 
@@ -113,8 +114,10 @@ class LilypondFormatter(object):
 		self._melody = []
 		self._melody_last_note = None
 		self._note_len = Fraction(0, 1)
+		self._articultion = None
 		self._text = None
 		self._brace_count = 0
+		self._inside_slur = False
 
 	def set_file(self, f):
 		self.f = f
@@ -132,6 +135,14 @@ class LilypondFormatter(object):
 		else:
 			self.format_comment("ERROR: Unsupported attribute (%s: '%s')\n" % (key, value))
 
+	def format_articulation(self, articulation):
+		if articulation == 'D':
+			self._articultion = '\downbow'
+		elif articulation == 'U':
+			self._articultion = '\upbow'
+		else:
+			self.format_comment("ERROR: Unsupported articulation ('%s')\n" % (articulation))
+
 	def format_comment(self, comment):
 		# Force a line break if the last line does not have one
 		if len(self._melody) and not self._melody[-1].endswith('\n'):
@@ -142,7 +153,9 @@ class LilypondFormatter(object):
 		self._attributes['composer'] = composer
 
 	def format_duration(self, duration):
-		self._duration = duration
+		# For lilypond output the parser not duration is unimportant
+		# (lilypond will format the durations itself)
+		pass
 
 	def format_key(self, key):
 		assert(len(key) > 0)
@@ -195,10 +208,15 @@ class LilypondFormatter(object):
 
 	def format_note(self, notes, duration, tie):
 		ly_notes = []
+		slur = False
+
 		for note, string in zip(notes, range(6, 0, -1)):
 			if note is None:
 				continue
 			ly_notes.append(note.to_lilypond() + '\\' + str(string))
+			if note.has_articulation(vtab.note.HAMMER_ON) or \
+			   note.has_articulation(vtab.note.PULL_OFF):
+				slur = True
 
 		if 0 != len(ly_notes):
 			lynote = '<' + (' '.join(ly_notes)) + '>'
@@ -217,11 +235,20 @@ class LilypondFormatter(object):
 		if self._text:
 			lytext = '^"%s"' % self._text
 			self._text = None
+		if self._articultion:
+			lytext += '^%s' % self._articultion
+			self._articulation = None
 
 		if tie:
 			assert(None != self._melody_last_note)
 			assert(0 != len(ly_notes))
 			self._melody[self._melody_last_note] += '~'
+		if slur and not self._inside_slur:
+			self._melody[self._melody_last_note] += '('
+			self._inside_slur = True
+		if not slur and self._inside_slur:
+			self._melody[self._melody_last_note] += ')'
+			self._inside_slur = False
 		self._melody_last_note = len(self._melody)
 		self._melody.append(lynote + lyduration + lytext)
 

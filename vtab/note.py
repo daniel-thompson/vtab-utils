@@ -1,5 +1,8 @@
 import re
 
+HAMMER_ON = 'hammer-on'
+PULL_OFF = 'pull-off'
+
 class Note(object):
 	'''
 	classdocs
@@ -9,11 +12,14 @@ class Note(object):
 
 	MIDI_OFFSET = 12
 
+	VALID_ARTICULATION = ( HAMMER_ON, PULL_OFF )
+
 	def __init__(self, s):
 		try:
 			self.pitch = int(s)
 		except:
 			self.set(s)
+		self.articulation = set()
 
 	def __cmp__(self, other):
 		if None == other:
@@ -97,3 +103,28 @@ class Note(object):
 
 	def __int__(self):
 		return self.pitch
+
+	def add_articulation(self, a):
+		"""Add articulation metadata to the current note.
+
+		Metadata is *not* included during copy, compare, stringize or any
+		similar operation.
+
+		"""
+		assert(a in self.VALID_ARTICULATION)
+		self.articulation.add(a)
+
+	def remove_articulation(self, a):
+		"""Remove articulation metadata from the current note.
+
+		Metadata is *not* included during copy, compare, stringize or any
+		similar operation.
+
+		"""
+		assert(a in self.VALID_ARTICULATION)
+		self.articulation.discard(a)
+
+	def has_articulation(self, a):
+		"""Test whether the note includes a specific item of metadata."""
+		assert(a in self.VALID_ARTICULATION)
+		return a in self.articulation

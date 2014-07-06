@@ -7,6 +7,7 @@ import traceback
 
 from fractions import Fraction
 from vtab import tunings
+import vtab.note
 
 class VtabParser(object):
 	'''Match a barline (or underline), yielding barline and decoration
@@ -25,7 +26,7 @@ class VtabParser(object):
 	a recogniser (based on all tabs being for instruments with at
 	least four strings).
 	Template is: " | 10  |  9"'''
-	RE_NOTE = re.compile(r'^\s*[|:0-9\-]+\s+[|:0-9\-]+\s+[|:0-9\-]+\s+[|:0-9\-]+')
+	RE_NOTE = re.compile(r'^\s*[hp\-]*[|:0-9]+[\-]*\s+[hp\-]*[|:0-9]+[\-]*\s+[hp\-]*[|:0-9]+[\-]*\s+[hp\-]*[|:0-9]+[\-]*')
 
 	def __init__(self):
 		self.formatters = []
@@ -61,6 +62,7 @@ class VtabParser(object):
 
 	def parse_keypair(self, key, value):
 		lookup  = {
+			'a' : 'articulation',
 			't' : 'text',
 		}
 		key = key.lower()
@@ -124,8 +126,16 @@ class VtabParser(object):
 
 		def parse_string(open_string, fret):
 			try:
-				fret = fret.strip('-') # Fake voice support
-				return open_string + int(fret)
+				articulation = fret
+				fret = fret.lstrip('hp-')
+				articulation = articulation.replace(fret, '')
+				fret = fret.rstrip('-') # Fake voice support
+				note = open_string + int(fret)
+				if 'h' in articulation:
+					note.add_articulation(vtab.note.HAMMER_ON)
+				if 'p' in articulation:
+					note.add_articulation(vtab.note.PULL_OFF)
+				return note
 			except:
 				return None
 
