@@ -502,6 +502,30 @@ class VtabParserTest(unittest.TestCase):
 		self.expectNote('E2  X  X  X  X  X')
 		self.expectBarline('-')
 
+	def testHammerOn(self):
+		self.parse("""
+		 ----------------
+		 |  0  |  |  |  |  4
+		 | h2  |  |  |  |
+		 |  0  |  |  |  |  8
+		 | h2  |  |  |  |
+		 | h3  |  |  |  |
+		 |  0  |  |  |  |
+		 ----------------
+		""")
+
+		self.expectBarline('-')
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,4)))
+		self.expectNote(' X A2  X  X  X  X', Fraction(1,4))
+		self.expectNote(' X B2  X  X  X  X', Fraction(1,4))
+		self.expectHistory(('format_attribute', 'duration', Fraction(1,8)))
+		self.expectNote(' X A2  X  X  X  X', Fraction(1,8))
+		self.expectNote(' X B2  X  X  X  X', Fraction(1,8))
+		self.expectNote(' X C3  X  X  X  X', Fraction(1,8))
+		self.expectNote(' X A2  X  X  X  X', Fraction(1,8))
+		self.expectBarline('-')
+
+
 if __name__ == "__main__":
 	#import sys;sys.argv = ['', 'Test.testName']
 	unittest.main()
