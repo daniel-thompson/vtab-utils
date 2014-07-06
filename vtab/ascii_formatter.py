@@ -42,9 +42,8 @@ class AsciiFormatter(object):
 		else:
 			self._comments.append(comment)
 
-	def format_duration(self, unused):
-		# For asciitab the duration is not important
-		pass
+	def format_duration(self, duration):
+		self._duration = duration
 
 	def format_key(self, unused):
 		# For tab only output the key is not important
@@ -92,12 +91,19 @@ class AsciiFormatter(object):
 			else:
 				fret = int(note - tuning)
 				frets.append(str(fret))
-		width = max([ len(fret) for fret in frets ]) + 1
+
+		post_padding = max(int(duration / self._duration) - 1, 0)
+		width = max([ len(fret) for fret in frets ]) + post_padding + 1
+
 		if len(''.join(self._staff_lines[0])) + width >= self.LINE_LENGTH:
 			self.flush()
+
 		for line, fret in zip(self._staff_lines, frets):
-			padding = width - len(fret)
-			line.append(('-' * padding) + fret)
+			pre_padding = width - len(fret) - post_padding
+			line.append(('-' * pre_padding) + fret + '-' * post_padding)
+
+
+
 
 	def flush(self):
 		if self._pad:
