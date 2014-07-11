@@ -1,4 +1,5 @@
 import re, unittest, sys
+from fractions import Fraction
 from vtab import tunings
 
 class AsciiFormatter(object):
@@ -8,6 +9,7 @@ class AsciiFormatter(object):
 		self.f = sys.stdout
 		self._staff_lines = ()
 		self._comments = []
+		self._duration = Fraction(1, 4)
 		self._pad = False
 
 		self.set_tuning(tunings.STANDARD_TUNING)
