@@ -28,6 +28,6 @@ distutils.core.setup(name='vtab-utils',
       author='Daniel Thompson',
       url='http://redfelineninja.org.uk/daniel/',
       packages=['vtab'],
-      scripts=['vtab2ascii', 'vtab2dummy', 'vtab2ly', 'vtab2pdf'],
+      scripts=['vtab2ascii', 'vtab2dummy', 'vtab2ly', 'vtab2pdf', 'vtab2svg'],
       cmdclass={'test': test}
      )
