@@ -4,7 +4,7 @@ Created on 24 Jun 2013
 @author: drt
 '''
 
-from note import Note
+from .note import Note
 
 STANDARD_TUNING = (
 		Note('E2'),

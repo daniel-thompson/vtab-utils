@@ -21,11 +21,26 @@ class Note(object):
 			self.set(s)
 		self.articulation = set()
 
-	def __cmp__(self, other):
-		if None == other:
-			return 1
+	def __hash__(self):
+		return int(self)
 
-		return int(self) - int(other)
+	def __lt__(self, other):
+		return int(self) < int(other)
+
+	def __le__(self, other):
+		return int(self) <= int(other)
+
+	def __eq__(self, other):
+		if not other:
+			return False
+
+		return int(self) == int(other)
+
+	def __ge__(self, other):
+		return int(self) >= int(other)
+
+	def __gt__(self, other):
+		return int(self) > int(other)
 
 	def __add__(self, other):
 		return Note(self.pitch + int(other))

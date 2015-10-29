@@ -1,4 +1,4 @@
-import StringIO
+import io
 import unittest
 from fractions import Fraction
 
@@ -32,7 +32,7 @@ class VtabParserTest(unittest.TestCase):
 		for fmt in (vtab.AsciiFormatter(),
 			    vtab.DummyFormatter(),
 			    vtab.LilypondFormatter()):
-			sio = StringIO.StringIO()
+			sio = io.StringIO()
 			fmt.set_file(sio)
 			self.parser.add_formatter(fmt)
 
@@ -395,7 +395,7 @@ class VtabParserTest(unittest.TestCase):
 		self.expectNote(' X  X  X A3 C4 F4', Fraction(2,16))
 		self.expectNote(' X  X  X  X  X  X', Fraction(2,16))
 
-        def testRestAtStartOfLine(self):
+	def testRestAtStartOfLine(self):
 		self.parse("""
 			-----------
 			| | | | | |  2

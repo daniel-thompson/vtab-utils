@@ -10,7 +10,7 @@ output through that tool and check the return code.
 
 """
 import glob
-import StringIO
+import io
 import subprocess
 import unittest
 
@@ -41,7 +41,7 @@ class ParametrizedTestCase(unittest.TestCase):
 
 class ExampleTestCase(ParametrizedTestCase):
 	def doParse(self, fmt):
-		sio = StringIO.StringIO()
+		sio = io.StringIO()
 		fmt.set_file(sio)
 		p = vtab.VtabParser()
 		p.add_formatter(fmt)
@@ -66,8 +66,10 @@ class ExampleTestCase(ParametrizedTestCase):
 				stdin=subprocess.PIPE,
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE)
-		(out, err) = lysub.communicate(lyio.getvalue())
+		(out, err) = lysub.communicate(lyio.getvalue().encode('UTF-8'))
 		self.assertEqual(0, lysub.returncode)
+		out = out.decode('UTF-8')
+		err = err.decode('UTF-8')
 		for s in ('error', 'warning'):
 			self.assertNotIn(s, out+err, msg % s)
 

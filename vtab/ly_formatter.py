@@ -139,7 +139,7 @@ class LilypondFormatter(object):
 		if articulation == 'D':
 			self._articultion = '\downbow'
 		elif articulation == 'U':
-			self._articultion = '\upbow'
+			self._articultion = '\\upbow'
 		else:
 			self.format_comment("ERROR: Unsupported articulation ('%s')\n" % (articulation))
 
@@ -210,7 +210,7 @@ class LilypondFormatter(object):
 		ly_notes = []
 		slur = False
 
-		for note, string in zip(notes, range(6, 0, -1)):
+		for note, string in zip(notes, list(range(6, 0, -1))):
 			if note is None:
 				continue
 			ly_notes.append(note.to_lilypond() + '\\' + str(string))

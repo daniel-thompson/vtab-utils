@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import distutils.core
 import unittest
@@ -27,6 +27,7 @@ distutils.core.setup(name='vtab-utils',
       description='A collection of programs to work with vertical tab',
       author='Daniel Thompson',
       url='http://redfelineninja.org.uk/daniel/',
+      license='GPLv3+',
       packages=['vtab'],
       scripts=['vtab2ascii', 'vtab2dummy', 'vtab2ly', 'vtab2pdf', 'vtab2svg'],
       cmdclass={'test': test}
