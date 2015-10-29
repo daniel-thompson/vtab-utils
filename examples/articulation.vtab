@@ -1,0 +1,27 @@
+Articulation study
+==================
+
+# WARNING: This example can be parsed by the articulations are not yet
+#          supported by the backends.
+
+Key: C
+Time: 4/4
+
+================
+|  |  |  4  |  |  16
+|  |  | h5  |  |
+|  |  | p4  |  |
+|  |  5  |  |  |
+|  |  |  4  |  |  16
+|  |  | h7  |  |
+|  |  | p4  |  |
+|  |  5  |  |  |
+|  |  |  4  |  |  16
+|  |  | h5  |  |
+|  |  | p4  |  |
+|  |  5  |  |  |
+|  |  |  4  |  |  16
+|  |  | h7  |  |
+|  |  | p4  |  |
+|  |  5  |  |  |
+================
